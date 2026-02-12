@@ -1,4 +1,5 @@
 import re#Manejo de expresiones regulares
+
 #Sirve para dibujar el grafico
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -19,53 +20,93 @@ class CalculadoraArbol:
         }
 
     def infija_a_posfija(self, ecuacion):
-        tockens = re.findall(r"(\d+|[/√+*^()-])", ecuacion)
+        # 1. Obtener tokens
+        tokens_originales = re.findall(r"(\d+|[/√+*^()-])", ecuacion)
+        tokens_nuevos = []
+
+        # --- VALIDACIÓN 1: NO EMPEZAR CON OPERADOR BINARIO ---
+        # Si lo primero es un *, /, ^, etc. (Excepto √ o - que pueden ser unarios)
+        if tokens_originales and tokens_originales[0] in ['*', '/', '^', ')']:
+            raise ValueError(f"La ecuación no puede iniciar con '{tokens_originales[0]}'")
+
+        # Definimos quiénes son operadores peligrosos si se juntan
+        operadores = ['+', '-', '*', '/', '^', '√']
+
+        for i, token in enumerate(tokens_originales):
+            # --- VALIDACIÓN 2: CHOQUE DE OPERADORES (El error de 3+*2) ---
+            if i > 0:
+                previo = tokens_originales[i - 1]
+
+                # Si el actual es operador Y el anterior también fue operador
+                # Ejemplo: "3 + *" -> previo='+', token='*' -> ¡ERROR!
+                if token in ['+', '*', '/', '^'] and previo in operadores:
+                    raise ValueError(
+                        f"Error de sintaxis: No puede haber dos operadores seguidos ('{previo}' y '{token}')")
+
+                # Validación extra: Paréntesis vacío "()"
+                if token == ')' and previo == '(':
+                    raise ValueError("Error: Paréntesis vacíos '()'")
+
+            # --- Lógica de inyección del 2 (Tu código anterior) ---
+            if token == '√':
+                if i == 0 or tokens_originales[i - 1] in ['+', '-', '*', '/', '^', '(', '√']:
+                    tokens_nuevos.append('2')
+
+            tokens_nuevos.append(token)
+
+        # --- VALIDACIÓN 3: NO TERMINAR CON OPERADOR ---
+        if tokens_nuevos and tokens_nuevos[-1] in operadores:
+            raise ValueError("La ecuación no puede terminar en operador.")
+
+        # 3. Algoritmo Shunting-yard (Esto sigue igual)
         salida = []
         pila = []
 
-        for tocken in tockens:
+        for tocken in tokens_nuevos:
             if tocken.isdigit():
                 salida.append(tocken)
-
             elif tocken == '(':
                 pila.append(tocken)
-
             elif tocken == ')':
-                while pila[-1] != '(':
+                # Validación de paréntesis balanceados
+                while pila and pila[-1] != '(':
                     salida.append(pila.pop())
+                if not pila: raise ValueError("Error: Paréntesis de cierre ')' sin apertura.")
                 pila.pop()
-
             else:
                 while pila and pila[-1] != '(' and self.preferencia.get(pila[-1], 0) >= self.preferencia.get(tocken, 0):
                     salida.append(pila.pop())
-
                 pila.append(tocken)
 
         while pila:
-            salida.append(pila.pop())
+            op = pila.pop()
+            if op == '(': raise ValueError("Error: Paréntesis de apertura '(' sin cierre.")
+            salida.append(op)
 
         return salida
 
     def construir_arbol(self, lista_posfija):
         pila_arbol = []
 
-        for tocken in lista_posfija:
-            if tocken.isdigit():
-                nodo = Nodo(tocken)
+        for token in lista_posfija:
+            if token.isdigit():
+                nodo = Nodo(token)
                 pila_arbol.append(nodo)
             else:
-                nuevo_nodo = Nodo(tocken)
+                nuevo_nodo = Nodo(token)
 
-                if tocken == '√':
-                    if pila_arbol:
-                        nuevo_nodo.derecha = pila_arbol.pop()
-                else:
-                    if len(pila_arbol) >= 2:
-                        nuevo_nodo.derecha = pila_arbol.pop()
-                        nuevo_nodo.izquierda = pila_arbol.pop()
+                # --- VALIDACIÓN NUEVA ---
+                if len(pila_arbol) < 2:
+                    raise ValueError(f"Expresión mal formada: Falta un número para el operador '{token}'")
+                # ------------------------
+
+                nuevo_nodo.derecha = pila_arbol.pop()
+                nuevo_nodo.izquierda = pila_arbol.pop()
 
                 pila_arbol.append(nuevo_nodo)
 
+        if len(pila_arbol) != 1:
+             raise ValueError("Expresión incompleta (sobran números o faltan operadores)")
 
         return pila_arbol.pop() if pila_arbol else None
 
@@ -127,13 +168,19 @@ class CalculadoraArbol:
         if op == '*': return valor_izq * valor_der
         if op == '/':
             if valor_der == 0:
-                return ValueError("No se puede dividir entre cero")
+                raise ValueError("No se puede dividir entre cero")
             else:
                 return valor_izq / valor_der
         if op == '^': return pow(valor_izq, valor_der)
 
+        if op == '√' or op == '^':
+            if valor_der < 0 and (valor_izq % 2 == 0 or (0 < valor_izq < 1)):
+                raise ValueError("Resultado imaginario: No se puede raíz par de negativo")
+
         if op == '√':
-            return math.sqrt(valor_der)
+            if valor_izq == 0: return 0
+            else:
+                return pow(valor_der, 1/valor_izq)
 
         return 0
 
@@ -153,6 +200,10 @@ def main():
         if opcion == "1":
             print("Ingrese la ecuación (ej: (6/3)*5 ):")
             ecuacion = input(">> ")
+
+            if re.search(r"[^0-9+\-*/^()√.\s]", ecuacion):
+                print("Error: La ecuación contiene caracteres inválidos (letras o símbolos raros).")
+                continue
 
             try:
                 # 1. Obtener Posfija
