@@ -1,9 +1,13 @@
-import re
+import re#Manejo de expresiones regulares
+#Sirve para dibujar el grafico
 import networkx as nx
 import matplotlib.pyplot as plt
-import math
 
-from Nodo import Nodo
+import time
+
+import math#Funciones matematicas
+
+from Nodo import Nodo#conecta con otro archivo
 
 class CalculadoraArbol:
     def __init__(self):
@@ -98,10 +102,11 @@ class CalculadoraArbol:
         procesar_nodo(raiz, 0)
 
         plt.figure(figsize=(10, 6))
+        plt.title(f"Árbol: {ecuacion_texto}")
         nx.draw(G, pos, labels=labels, with_labels=True,
                 node_size=2500, node_color="lightgreen",
                 edge_color="black", font_size=12, font_weight="bold", arrows=False)
-        plt.title(f"Árbol: {ecuacion_texto}")
+
         plt.axis("off")
         plt.show()
 
@@ -120,7 +125,11 @@ class CalculadoraArbol:
         if op == '+': return valor_izq + valor_der
         if op == '-': return valor_izq - valor_der
         if op == '*': return valor_izq * valor_der
-        if op == '/': return valor_izq / valor_der
+        if op == '/':
+            if valor_der == 0:
+                return ValueError("No se puede dividir entre cero")
+            else:
+                return valor_izq / valor_der
         if op == '^': return pow(valor_izq, valor_der)
 
         if op == '√':
@@ -146,9 +155,9 @@ def main():
             ecuacion = input(">> ")
 
             try:
-                # 1. Obtener Postfix
+                # 1. Obtener Posfija
                 postfix = calc.infija_a_posfija(ecuacion)
-                print(f"Postfix: {postfix}")
+                print(f"Postfija: {postfix}")
 
                 # 2. Construir Árbol
                 raiz = calc.construir_arbol(postfix)
@@ -159,6 +168,7 @@ def main():
 
                 # 3. Graficar
                 print("Generando gráfico...")
+                time.sleep(1)
                 calc.graficar(raiz, ecuacion)
 
             except Exception as e:
@@ -166,6 +176,7 @@ def main():
 
         elif opcion == "2":
             print("Saliendo...")
+            time.sleep(1)
             break
         else:
             print("Opción no válida.")
