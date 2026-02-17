@@ -1,14 +1,6 @@
 import re#Manejo de expresiones regulares
 
-#Sirve para dibujar el grafico
-import networkx as nx
-import matplotlib.pyplot as plt
-
-import time
-
-import math#Funciones matematicas
-
-from Nodo import Nodo#conecta con otro archivo
+from Logica.Nodo import Nodo#conecta con otro archivo
 
 class CalculadoraArbol:
     def __init__(self):
@@ -110,47 +102,6 @@ class CalculadoraArbol:
 
         return pila_arbol.pop() if pila_arbol else None
 
-    def graficar(self, raiz, ecuacion_texto):
-        """Dibuja el árbol usando NetworkX"""
-        if not raiz:
-            print("No hay árbol para dibujar.")
-            return
-
-        G = nx.DiGraph()
-        labels = {}
-        pos = {}
-        contador_x = [0]
-
-        def procesar_nodo(nodo, nivel):
-            if not nodo: return
-
-            # Izquierda
-            if nodo.izquierda:
-                G.add_edge(id(nodo), id(nodo.izquierda))
-                procesar_nodo(nodo.izquierda, nivel + 1)
-
-            # Centro (Nodo actual)
-            nodo_id = id(nodo)
-            labels[nodo_id] = nodo.valor
-            pos[nodo_id] = (contador_x[0], -nivel)
-            contador_x[0] += 1
-
-            # Derecha
-            if nodo.derecha:
-                G.add_edge(id(nodo), id(nodo.derecha))
-                procesar_nodo(nodo.derecha, nivel + 1)
-
-        procesar_nodo(raiz, 0)
-
-        plt.figure(figsize=(10, 6))
-        plt.title(f"Árbol: {ecuacion_texto}")
-        nx.draw(G, pos, labels=labels, with_labels=True,
-                node_size=2500, node_color="lightgreen",
-                edge_color="black", font_size=12, font_weight="bold", arrows=False)
-
-        plt.axis("off")
-        plt.show()
-
     def evaluar(self, nodo):
         if not nodo:
             return 0
@@ -183,55 +134,3 @@ class CalculadoraArbol:
                 return pow(valor_der, 1/valor_izq)
 
         return 0
-
-
-def main():
-    calc = CalculadoraArbol()  # Instanciamos la clase una sola vez
-
-    MENU = """
-    === ARBOLES DE EXPRESION ===
-    1.- Ingresar expresión y Graficar
-    2.- Salir
-    Seleccione una opción: """
-
-    while True:
-        opcion = input(MENU)
-
-        if opcion == "1":
-            print("Ingrese la ecuación (ej: (6/3)*5 ):")
-            ecuacion = input(">> ")
-
-            if re.search(r"[^0-9+\-*/^()√.\s]", ecuacion):
-                print("Error: La ecuación contiene caracteres inválidos (letras o símbolos raros).")
-                continue
-
-            try:
-                # 1. Obtener Posfija
-                postfix = calc.infija_a_posfija(ecuacion)
-                print(f"Postfija: {postfix}")
-
-                # 2. Construir Árbol
-                raiz = calc.construir_arbol(postfix)
-
-                # --- CALCULAR RESULTADO ---
-                resultado = calc.evaluar(raiz)
-                print(f"El resultado es: {resultado}")
-
-                # 3. Graficar
-                print("Generando gráfico...")
-                time.sleep(1)
-                calc.graficar(raiz, ecuacion)
-
-            except Exception as e:
-                print(f"Error al procesar la ecuación: {e}")
-
-        elif opcion == "2":
-            print("Saliendo...")
-            time.sleep(1)
-            break
-        else:
-            print("Opción no válida.")
-
-
-if __name__ == "__main__":
-    main()
