@@ -1,136 +1,126 @@
-import re#Manejo de expresiones regulares
+import re
+from Logica.Nodo import Nodo
 
-from Logica.Nodo import Nodo#conecta con otro archivo
 
 class CalculadoraArbol:
     def __init__(self):
-        self.preferencia = {
-            '^': 3, '√': 3,
-            '*': 2, '/': 2,
-            '+': 1, '-': 1,
-            '(': 0
-        }
+        # Preferencia de operadores (jerarquía)
+        self.preferencia = {'^': 3, '√': 3, '*': 2, '/': 2, '+': 1, '-': 1, '(': 0}
 
     def infija_a_posfija(self, ecuacion):
-        # 1. Obtener tokens
-        tokens_originales = re.findall(r"(\d+|[/√+*^()-])", ecuacion)
+        # 1. Limpieza y Tokenización
+        tokens_originales = re.findall(r"(\d+(?:\.\d+)?|[/√+*^()-])", ecuacion)
         tokens_nuevos = []
 
-        # --- VALIDACIÓN 1: NO EMPEZAR CON OPERADOR BINARIO ---
-        # Si lo primero es un *, /, ^, etc. (Excepto √ o - que pueden ser unarios)
-        if tokens_originales and tokens_originales[0] in ['*', '/', '^', ')']:
-            raise ValueError(f"La ecuación no puede iniciar con '{tokens_originales[0]}'")
+        if not tokens_originales: return []
 
-        # Definimos quiénes son operadores peligrosos si se juntan
+        # Validaciones iniciales
+        if tokens_originales[0] in ['*', '/', '^', ')']:
+            raise ValueError(f"Inicio inválido con '{tokens_originales[0]}'")
+
         operadores = ['+', '-', '*', '/', '^', '√']
 
         for i, token in enumerate(tokens_originales):
-            # --- VALIDACIÓN 2: CHOQUE DE OPERADORES (El error de 3+*2) ---
-            if i > 0:
-                previo = tokens_originales[i - 1]
-
-                # Si el actual es operador Y el anterior también fue operador
-                # Ejemplo: "3 + *" -> previo='+', token='*' -> ¡ERROR!
-                if token in ['+', '*', '/', '^'] and previo in operadores:
-                    raise ValueError(
-                        f"Error de sintaxis: No puede haber dos operadores seguidos ('{previo}' y '{token}')")
-
-                # Validación extra: Paréntesis vacío "()"
-                if token == ')' and previo == '(':
-                    raise ValueError("Error: Paréntesis vacíos '()'")
-
-            # --- Lógica de inyección del 2 (Tu código anterior) ---
+            # Inyección del '2' para raíces cuadradas implícitas (ej: √16 -> 2√16)
             if token == '√':
-                if i == 0 or tokens_originales[i - 1] in ['+', '-', '*', '/', '^', '(', '√']:
+                if i == 0 or tokens_originales[i - 1] in operadores or tokens_originales[i - 1] == '(':
                     tokens_nuevos.append('2')
 
             tokens_nuevos.append(token)
 
-        # --- VALIDACIÓN 3: NO TERMINAR CON OPERADOR ---
-        if tokens_nuevos and tokens_nuevos[-1] in operadores:
-            raise ValueError("La ecuación no puede terminar en operador.")
-
-        # 3. Algoritmo Shunting-yard (Esto sigue igual)
+        # 2. Algoritmo Shunting-yard
         salida = []
         pila = []
 
-        for tocken in tokens_nuevos:
-            if tocken.isdigit():
-                salida.append(tocken)
-            elif tocken == '(':
-                pila.append(tocken)
-            elif tocken == ')':
-                # Validación de paréntesis balanceados
+        for token in tokens_nuevos:
+            if token.replace('.', '', 1).isdigit():  # Soporte para decimales
+                salida.append(token)
+            elif token == '(':
+                pila.append(token)
+            elif token == ')':
                 while pila and pila[-1] != '(':
                     salida.append(pila.pop())
-                if not pila: raise ValueError("Error: Paréntesis de cierre ')' sin apertura.")
+                if not pila: raise ValueError("Paréntesis desbalanceados")
                 pila.pop()
             else:
-                while pila and pila[-1] != '(' and self.preferencia.get(pila[-1], 0) >= self.preferencia.get(tocken, 0):
+                while pila and pila[-1] != '(' and self.preferencia.get(pila[-1], 0) >= self.preferencia.get(token, 0):
                     salida.append(pila.pop())
-                pila.append(tocken)
+                pila.append(token)
 
         while pila:
-            op = pila.pop()
-            if op == '(': raise ValueError("Error: Paréntesis de apertura '(' sin cierre.")
-            salida.append(op)
+            salida.append(pila.pop())
 
         return salida
 
     def construir_arbol(self, lista_posfija):
         pila_arbol = []
-
         for token in lista_posfija:
-            if token.isdigit():
-                nodo = Nodo(token)
-                pila_arbol.append(nodo)
+            if token.replace('.', '', 1).isdigit():
+                pila_arbol.append(Nodo(token))
             else:
-                nuevo_nodo = Nodo(token)
-
-                # --- VALIDACIÓN NUEVA ---
-                if len(pila_arbol) < 2:
-                    raise ValueError(f"Expresión mal formada: Falta un número para el operador '{token}'")
-                # ------------------------
-
-                nuevo_nodo.derecha = pila_arbol.pop()
-                nuevo_nodo.izquierda = pila_arbol.pop()
-
-                pila_arbol.append(nuevo_nodo)
-
-        if len(pila_arbol) != 1:
-             raise ValueError("Expresión incompleta (sobran números o faltan operadores)")
+                if len(pila_arbol) < 2: raise ValueError("Faltan operandos")
+                nodo = Nodo(token)
+                nodo.derecha = pila_arbol.pop()
+                nodo.izquierda = pila_arbol.pop()
+                pila_arbol.append(nodo)
 
         return pila_arbol.pop() if pila_arbol else None
 
     def evaluar(self, nodo):
-        if not nodo:
-            return 0
+        # Versión simple que solo devuelve el resultado
+        res, _ = self.evaluar_con_pasos(nodo)
+        return res
 
+    def evaluar_con_pasos(self, nodo):
+        """
+        Devuelve una tupla: (resultado_numerico, lista_de_pasos_texto)
+        """
+        if not nodo: return 0, []
+
+        # Caso Base: Es un número (Hoja)
         if nodo.izquierda is None and nodo.derecha is None:
-            return float(nodo.valor)
+            return float(nodo.valor), []
 
-        valor_izq = self.evaluar(nodo.izquierda) if nodo.izquierda else 0
-        valor_der = self.evaluar(nodo.derecha) if nodo.derecha else 0
+        # Paso Recursivo: Evaluar hijos
+        val_izq, pasos_izq = self.evaluar_con_pasos(nodo.izquierda) if nodo.izquierda else (0, [])
+        val_der, pasos_der = self.evaluar_con_pasos(nodo.derecha) if nodo.derecha else (0, [])
 
+        # Operación Actual
         op = nodo.valor
+        res = 0
+        paso_texto = ""
 
-        if op == '+': return valor_izq + valor_der
-        if op == '-': return valor_izq - valor_der
-        if op == '*': return valor_izq * valor_der
-        if op == '/':
-            if valor_der == 0:
-                raise ValueError("No se puede dividir entre cero")
-            else:
-                return valor_izq / valor_der
-        if op == '^': return pow(valor_izq, valor_der)
+        try:
+            if op == '+':
+                res = val_izq + val_der
+                paso_texto = f"{self._fmt(val_izq)} + {self._fmt(val_der)} = {self._fmt(res)}"
+            elif op == '-':
+                res = val_izq - val_der
+                paso_texto = f"{self._fmt(val_izq)} - {self._fmt(val_der)} = {self._fmt(res)}"
+            elif op == '*':
+                res = val_izq * val_der
+                paso_texto = f"{self._fmt(val_izq)} * {self._fmt(val_der)} = {self._fmt(res)}"
+            elif op == '/':
+                if val_der == 0: raise ValueError("División por cero")
+                res = val_izq / val_der
+                paso_texto = f"{self._fmt(val_izq)} / {self._fmt(val_der)} = {self._fmt(res)}"
+            elif op == '^':
+                res = pow(val_izq, val_der)
+                paso_texto = f"{self._fmt(val_izq)} ^ {self._fmt(val_der)} = {self._fmt(res)}"
+            elif op == '√':
+                if val_izq == 0:
+                    res = 0
+                else:
+                    res = pow(val_der, 1 / val_izq)
+                paso_texto = f"Raíz {self._fmt(val_izq)} de {self._fmt(val_der)} = {self._fmt(res)}"
+        except Exception as e:
+            raise ValueError(f"Error matemático en {op}: {str(e)}")
 
-        if op == '√' or op == '^':
-            if valor_der < 0 and (valor_izq % 2 == 0 or (0 < valor_izq < 1)):
-                raise ValueError("Resultado imaginario: No se puede raíz par de negativo")
+        # Combinar pasos: pasos de los hijos + paso actual
+        todos_los_pasos = pasos_izq + pasos_der + [paso_texto]
+        return res, todos_los_pasos
 
-        if op == '√':
-            if valor_izq == 0: return 0
-            else:
-                return pow(valor_der, 1/valor_izq)
-
-        return 0
+    def _fmt(self, num):
+        """Ayuda visual: Quita el .0 si es entero"""
+        if num == int(num): return str(int(num))
+        return f"{num:.2f}"

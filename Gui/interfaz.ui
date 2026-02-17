@@ -211,7 +211,17 @@ QLineEdit#input_valor_nodo:focus {
        <item>
         <widget class="QPushButton" name="btn_cerrar">
          <property name="text">
-          <string>X</string>
+          <string/>
+         </property>
+         <property name="icon">
+          <iconset>
+           <normaloff>../Imagenes/WhatsApp Image 2026-02-16 at 7.57.27 PM.png</normaloff>../Imagenes/WhatsApp Image 2026-02-16 at 7.57.27 PM.png</iconset>
+         </property>
+         <property name="iconSize">
+          <size>
+           <width>32</width>
+           <height>32</height>
+          </size>
          </property>
         </widget>
        </item>
@@ -298,14 +308,14 @@ QLineEdit#input_valor_nodo:focus {
                  <widget class="QPushButton" name="btn_mas">
                   <property name="minimumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="maximumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="text">
@@ -317,14 +327,14 @@ QLineEdit#input_valor_nodo:focus {
                  <widget class="QPushButton" name="btn_5">
                   <property name="minimumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="maximumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="text">
@@ -336,14 +346,14 @@ QLineEdit#input_valor_nodo:focus {
                  <widget class="QPushButton" name="btn_parentesis1">
                   <property name="minimumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="maximumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="text">
@@ -355,14 +365,14 @@ QLineEdit#input_valor_nodo:focus {
                  <widget class="QPushButton" name="btn_borrar">
                   <property name="minimumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="maximumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="text">
@@ -374,14 +384,14 @@ QLineEdit#input_valor_nodo:focus {
                  <widget class="QPushButton" name="btn_4">
                   <property name="minimumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="maximumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="text">
@@ -393,14 +403,14 @@ QLineEdit#input_valor_nodo:focus {
                  <widget class="QPushButton" name="btn_6">
                   <property name="minimumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="maximumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="text">
@@ -412,14 +422,14 @@ QLineEdit#input_valor_nodo:focus {
                  <widget class="QPushButton" name="btn_0">
                   <property name="minimumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="maximumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="text">
@@ -431,14 +441,14 @@ QLineEdit#input_valor_nodo:focus {
                  <widget class="QPushButton" name="btn_9">
                   <property name="minimumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="maximumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="text">
@@ -450,14 +460,14 @@ QLineEdit#input_valor_nodo:focus {
                  <widget class="QPushButton" name="btn_entre">
                   <property name="minimumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="maximumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="text">
@@ -469,14 +479,14 @@ QLineEdit#input_valor_nodo:focus {
                  <widget class="QPushButton" name="btn_7">
                   <property name="minimumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="maximumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="text">
@@ -488,14 +498,14 @@ QLineEdit#input_valor_nodo:focus {
                  <widget class="QPushButton" name="btn_parentesis2">
                   <property name="minimumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="maximumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="text">
@@ -507,14 +517,14 @@ QLineEdit#input_valor_nodo:focus {
                  <widget class="QPushButton" name="btn_3">
                   <property name="minimumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="maximumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="text">
@@ -526,14 +536,14 @@ QLineEdit#input_valor_nodo:focus {
                  <widget class="QPushButton" name="btn_2">
                   <property name="minimumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="maximumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="text">
@@ -545,14 +555,14 @@ QLineEdit#input_valor_nodo:focus {
                  <widget class="QPushButton" name="btn_men">
                   <property name="minimumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="maximumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="text">
@@ -564,14 +574,14 @@ QLineEdit#input_valor_nodo:focus {
                  <widget class="QPushButton" name="btn_elevar">
                   <property name="minimumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="maximumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="text">
@@ -583,14 +593,14 @@ QLineEdit#input_valor_nodo:focus {
                  <widget class="QPushButton" name="btn_multi">
                   <property name="minimumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="maximumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="text">
@@ -602,14 +612,14 @@ QLineEdit#input_valor_nodo:focus {
                  <widget class="QPushButton" name="btn_8">
                   <property name="minimumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="maximumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="text">
@@ -621,14 +631,14 @@ QLineEdit#input_valor_nodo:focus {
                  <widget class="QPushButton" name="btn_1">
                   <property name="minimumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="maximumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="text">
@@ -640,14 +650,14 @@ QLineEdit#input_valor_nodo:focus {
                  <widget class="QPushButton" name="btn_pun">
                   <property name="minimumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="maximumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="text">
@@ -659,14 +669,14 @@ QLineEdit#input_valor_nodo:focus {
                  <widget class="QPushButton" name="btn_raiz">
                   <property name="minimumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="maximumSize">
                    <size>
-                    <width>90</width>
-                    <height>90</height>
+                    <width>70</width>
+                    <height>70</height>
                    </size>
                   </property>
                   <property name="text">
