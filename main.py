@@ -139,7 +139,7 @@ class MiVentana(QMainWindow):
             postfix = self.logica.infija_a_posfija(ecuacion)
             raiz = self.logica.construir_arbol(postfix)
             if raiz:
-                # AQUÍ ESTÁ LA MAGIA: EVALUAR CON PASOS
+                # EVALUAR CON PASOS
                 res, pasos = self.logica.evaluar_con_pasos(raiz)
 
                 # Mostrar Resultado
