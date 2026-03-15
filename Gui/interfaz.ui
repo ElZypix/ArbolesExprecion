@@ -733,7 +733,66 @@ QLineEdit#input_valor_nodo:focus {
                <number>0</number>
               </property>
               <item>
-               <widget class="QGraphicsView" name="visor_arbol"/>
+               <widget class="QTabWidget" name="tabWidget">
+                <property name="currentIndex">
+                 <number>6</number>
+                </property>
+                <widget class="QWidget" name="tab_7">
+                 <attribute name="title">
+                  <string>Arbol</string>
+                 </attribute>
+                 <layout class="QHBoxLayout" name="horizontalLayout_8">
+                  <property name="spacing">
+                   <number>0</number>
+                  </property>
+                  <property name="leftMargin">
+                   <number>0</number>
+                  </property>
+                  <property name="topMargin">
+                   <number>0</number>
+                  </property>
+                  <property name="rightMargin">
+                   <number>0</number>
+                  </property>
+                  <property name="bottomMargin">
+                   <number>0</number>
+                  </property>
+                  <item>
+                   <widget class="QTableWidget" name="tableWidget"/>
+                  </item>
+                 </layout>
+                </widget>
+                <widget class="QWidget" name="tab_8">
+                 <attribute name="title">
+                  <string>Prefija</string>
+                 </attribute>
+                </widget>
+                <widget class="QWidget" name="tab_9">
+                 <attribute name="title">
+                  <string>Infija</string>
+                 </attribute>
+                </widget>
+                <widget class="QWidget" name="tab_10">
+                 <attribute name="title">
+                  <string>Postfija</string>
+                 </attribute>
+                </widget>
+                <widget class="QWidget" name="tab_11">
+                 <attribute name="title">
+                  <string>Codigo P</string>
+                 </attribute>
+                </widget>
+                <widget class="QWidget" name="tab_12">
+                 <attribute name="title">
+                  <string>Triplos</string>
+                 </attribute>
+                </widget>
+                <widget class="QWidget" name="tab_13">
+                 <attribute name="title">
+                  <string>Cuadruplos</string>
+                 </attribute>
+                </widget>
+               </widget>
               </item>
              </layout>
             </widget>

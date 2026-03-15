@@ -1,15 +1,22 @@
 import re
 from Logica.Nodo import Nodo
 
-
 class CalculadoraArbol:
     def __init__(self):
         # Preferencia de operadores (jerarquía)
         self.preferencia = {'^': 3, '√': 3, '*': 2, '/': 2, '+': 1, '-': 1, '(': 0}
 
+    def es_operando(self, token):
+        """Devuelve True si el token es una variable (letra) o un número"""
+        if token.isalpha():  # Es una letra (ej. A, B, X)
+            return True
+        if token.replace('.', '', 1).isdigit():  # Es un número (ej. 10, 3.14)
+            return True
+        return False
+
     def infija_a_posfija(self, ecuacion):
-        # 1. Limpieza y Tokenización
-        tokens_originales = re.findall(r"(\d+(?:\.\d+)?|[/√+*^()-])", ecuacion)
+        # 1. Limpieza y Tokenización (AHORA ACEPTA LETRAS)
+        tokens_originales = re.findall(r"([a-zA-Z]+|\d+(?:\.\d+)?|[/√+*^()-])", ecuacion)
         tokens_nuevos = []
 
         if not tokens_originales: return []
@@ -33,7 +40,7 @@ class CalculadoraArbol:
         pila = []
 
         for token in tokens_nuevos:
-            if token.replace('.', '', 1).isdigit():  # Soporte para decimales
+            if self.es_operando(token):  # Usamos nuestra nueva función para aceptar letras y números
                 salida.append(token)
             elif token == '(':
                 pila.append(token)
@@ -55,7 +62,7 @@ class CalculadoraArbol:
     def construir_arbol(self, lista_posfija):
         pila_arbol = []
         for token in lista_posfija:
-            if token.replace('.', '', 1).isdigit():
+            if self.es_operando(token): # Acepta letras y números como hojas del árbol
                 pila_arbol.append(Nodo(token))
             else:
                 if len(pila_arbol) < 2: raise ValueError("Faltan operandos")
@@ -66,6 +73,32 @@ class CalculadoraArbol:
 
         return pila_arbol.pop() if pila_arbol else None
 
+    # ==========================================
+    # NUEVOS MÉTODOS: RECORRIDOS (NOTACIONES)
+    # ==========================================
+
+    def obtener_prefija(self, nodo):
+        """Recorrido Preorden (Raíz, Izquierda, Derecha) - Notación Polaca"""
+        if nodo is None:
+            return []
+        return [nodo.valor] + self.obtener_prefija(nodo.izquierda) + self.obtener_prefija(nodo.derecha)
+
+    def obtener_infija(self, nodo):
+        """Recorrido Inorden (Izquierda, Raíz, Derecha) - Notación Normal"""
+        if nodo is None:
+            return []
+        return self.obtener_infija(nodo.izquierda) + [nodo.valor] + self.obtener_infija(nodo.derecha)
+
+    def obtener_postfija(self, nodo):
+        """Recorrido Postorden (Izquierda, Derecha, Raíz) - Notación Polaca Inversa"""
+        if nodo is None:
+            return []
+        return self.obtener_postfija(nodo.izquierda) + self.obtener_postfija(nodo.derecha) + [nodo.valor]
+
+    # ==========================================
+    # EVALUACIÓN MATEMÁTICA (Solo para números)
+    # ==========================================
+
     def evaluar(self, nodo):
         # Versión simple que solo devuelve el resultado
         res, _ = self.evaluar_con_pasos(nodo)
@@ -74,12 +107,16 @@ class CalculadoraArbol:
     def evaluar_con_pasos(self, nodo):
         """
         Devuelve una tupla: (resultado_numerico, lista_de_pasos_texto)
+        Nota: Esto solo funcionará si la ecuación tiene puros números.
         """
         if not nodo: return 0, []
 
-        # Caso Base: Es un número (Hoja)
+        # Caso Base: Es un número o variable (Hoja)
         if nodo.izquierda is None and nodo.derecha is None:
-            return float(nodo.valor), []
+            try:
+                return float(nodo.valor), []
+            except ValueError:
+                raise ValueError(f"No se puede calcular matemáticamente la variable '{nodo.valor}'")
 
         # Paso Recursivo: Evaluar hijos
         val_izq, pasos_izq = self.evaluar_con_pasos(nodo.izquierda) if nodo.izquierda else (0, [])
