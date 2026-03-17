@@ -1,333 +1,446 @@
 import sys
-from PyQt6.QtWidgets import QApplication, QMainWindow, QGraphicsScene, QGraphicsEllipseItem, QGraphicsTextItem, QLabel, \
-    QGraphicsItem, QMessageBox, QTextEdit
-from PyQt6.QtGui import QPen, QBrush, QColor, QFont, QPainter, QMouseEvent
-from PyQt6.QtCore import Qt, QPoint
-from PyQt6 import uic
+import re
+from PyQt6 import QtWidgets, uic
+from PyQt6.QtWidgets import QLabel, QGraphicsScene, QGraphicsEllipseItem, QGraphicsTextItem, QMessageBox, QGraphicsItem
+from PyQt6.QtGui import QPen, QBrush, QColor, QFont
+from PyQt6.QtCore import Qt, QTimer
+
 from Logica.Arboles import CalculadoraArbol
+from Logica.Generador import GeneradorCodigo
+from Logica.Analizador import AnalizadorLexico
 from Logica.Nodo import Nodo
 
 
-class MiVentana(QMainWindow):
+class CompiladorApp(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
         uic.loadUi("Gui/interfaz.ui", self)
 
-        # --- CONTROL DE VENTANA ---
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.btn_cerrar.clicked.connect(self.close)
-        self.btn_minimizar.clicked.connect(self.showMinimized)
-        self.bt_maximizar.clicked.connect(self.maximizar_restaurar)
-        self.click_position = None
+        self.calc = CalculadoraArbol()
+        self.gen = GeneradorCodigo()
+        self.lexico = AnalizadorLexico()
 
-        # ==========================================================
-        #                 PESTAÑA 1: CALCULADORA
-        # ==========================================================
-        self.scene = QGraphicsScene()
-        self.visor_arbol.setScene(self.scene)
-        self.visor_arbol.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-        # 1. Etiqueta de Resultado
-        self.lbl_resultado = QLabel("Resultado: 0")
-        self.lbl_resultado.setStyleSheet("font-size: 22px; color: #2e7d32; font-weight: bold; margin: 5px;")
-        self.lbl_resultado.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self.fra_calcu.layout().addWidget(self.lbl_resultado)
-
-        # 2. Área de Procedimiento (PASO A PASO) - NUEVO
-        self.txt_pasos = QTextEdit()
-        self.txt_pasos.setReadOnly(True)
-        self.txt_pasos.setMaximumHeight(100)  # Que no ocupe toda la pantalla
-        self.txt_pasos.setPlaceholderText("Aquí aparecerá el procedimiento paso a paso...")
-        self.txt_pasos.setStyleSheet("""
-            QTextEdit {
-                background-color: #f9f9f9;
-                border: 1px solid #ccc;
-                border-radius: 5px;
-                font-family: 'Consolas', monospace;
-                font-size: 14px;
-                color: #555;
-            }
-        """)
-        self.fra_calcu.layout().addWidget(self.txt_pasos)
-
-        self.logica = CalculadoraArbol()
-
-        # Conexiones
-        for i in range(10): getattr(self, f"btn_{i}").clicked.connect(self.agregar_numero)
-
-        operadores = ["btn_mas", "btn_men", "btn_multi", "btn_entre", "btn_elevar", "btn_raiz", "btn_pun",
-                      "btn_parentesis1", "btn_parentesis2"]
-        for op in operadores: getattr(self, op).clicked.connect(self.agregar_numero)
-
-        self.btn_borrar.clicked.connect(self.limpiar_pantalla)
-        self.btn_del.clicked.connect(self.borrar_uno)
-
-        # ==========================================================
-        #              PESTAÑA 2: EDITOR (ARBOL A EXPRESION)
-        # ==========================================================
-        self.scene_editor = QGraphicsScene()
-        self.graphicsView.setScene(self.scene_editor)
-        self.graphicsView.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-        self.lbl_resultado_editor = QLabel("Resultado: 0")
-        self.lbl_resultado_editor.setStyleSheet("font-size: 18px; color: #2e7d32; font-weight: bold; margin-top: 10px;")
-        self.lbl_resultado_editor.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.panel_controles.layout().addWidget(self.lbl_resultado_editor)
-
-        # Área de Pasos para el Editor también
-        self.txt_pasos_editor = QTextEdit()
-        self.txt_pasos_editor.setReadOnly(True)
-        self.txt_pasos_editor.setMaximumHeight(100)
-        self.txt_pasos_editor.setStyleSheet(self.txt_pasos.styleSheet())  # Copiar estilo
-        self.panel_controles.layout().addWidget(self.txt_pasos_editor)
-
-        self.raiz_editor = None
+        # Variables Globales para el Árbol Manual (Anti-Crasheos)
+        self.arbol_manual = None
         self.nodo_seleccionado = None
         self.mapa_items = {}
 
-        self.btn_establecer.clicked.connect(self.agregar_nodo_manual)
-        self.btn_eliminar.clicked.connect(self.eliminar_nodo_manual)
-        self.btn_limpiar.clicked.connect(self.limpiar_editor)
-        self.scene_editor.selectionChanged.connect(self.al_seleccionar_nodo)
+        # Variables para Animación
+        self.timer_animacion = QTimer()
+        self.timer_animacion.timeout.connect(self.paso_animacion)
+        self.lista_animacion = []
+        self.pila_animacion = []
+        self.indice_animacion = 0
+        self.tipo_animacion = ""
+        self.arbol_animacion = None
 
-    # --- CONTROL VENTANA ---
-    def maximizar_restaurar(self):
-        if self.isMaximized():
-            self.showNormal()
-        else:
-            self.showMaximized()
+        self.aplicar_estilos_figma()
 
-    def mousePressEvent(self, event: QMouseEvent):
-        if event.button() == Qt.MouseButton.LeftButton and self.Barra_superior.geometry().contains(event.pos()):
-            self.click_position = event.globalPosition().toPoint()
-        event.accept()
+        # NAVEGACIÓN
+        self.btn_EArbol.clicked.connect(lambda: self.stackedWidget.setCurrentIndex(0))
+        self.btn_AExpresion.clicked.connect(lambda: self.cambiar_pestana_manual(1))
+        self.btn_ENotacion.clicked.connect(lambda: self.stackedWidget.setCurrentIndex(2))
+        self.btn_ANotacion.clicked.connect(lambda: self.cambiar_pestana_manual(3))
+        self.btn_Ecodigo.clicked.connect(lambda: self.stackedWidget.setCurrentIndex(4))
+        self.btn_ACodigo.clicked.connect(lambda: self.cambiar_pestana_manual(5))
 
-    def mouseMoveEvent(self, event: QMouseEvent):
-        if self.click_position:
-            delta = event.globalPosition().toPoint() - self.click_position
-            self.move(self.pos() + delta)
-            self.click_position = event.globalPosition().toPoint()
-            event.accept()
+        # ==========================================
+        # CONEXIONES DE EVENTOS
+        # ==========================================
+        # MODULO 1: Expresión a Árbol
+        self.inp_Exp.textChanged.connect(self.procesar_expresion_arbol_tiempo_real)
 
-    def mouseReleaseEvent(self, event: QMouseEvent):
-        self.click_position = None
+        # MÓDULOS MANUALES (2, 4 y 6) -> Comparten el mismo árbol
+        # Pag 2
+        self.btn_agregarAexp.clicked.connect(lambda: self.agregar_nodo_manual(self.inp_nod))
+        self.btn_EliminarAexp.clicked.connect(self.eliminar_nodo_manual)
+        self.btn_limpiarAexp.clicked.connect(self.limpiar_arbol_manual)
+        self.inp_nod.returnPressed.connect(lambda: self.agregar_nodo_manual(self.inp_nod))
+        # Pag 4
+        self.btn_AgregarANota.clicked.connect(lambda: self.agregar_nodo_manual(self.int_NodoANota))
+        self.btn_EliminarANota.clicked.connect(self.eliminar_nodo_manual)
+        self.btn_LimpiarANota.clicked.connect(self.limpiar_arbol_manual)
+        self.int_NodoANota.returnPressed.connect(lambda: self.agregar_nodo_manual(self.int_NodoANota))
+        # Pag 6
+        self.btn_AgregarACode.clicked.connect(lambda: self.agregar_nodo_manual(self.inp_ACode))
+        self.btn_EliminarACode.clicked.connect(self.eliminar_nodo_manual)
+        self.btn_LimpiarACode.clicked.connect(self.limpiar_arbol_manual)
+        self.inp_ACode.returnPressed.connect(lambda: self.agregar_nodo_manual(self.inp_ACode))
 
-    # --- PESTAÑA 1 ---
-    def agregar_numero(self):
-        boton = self.sender()
-        self.lbl_pantalla.setText(self.lbl_pantalla.text() + boton.text())
-        self.procesar_arbol()
+        # MODULO 3: Expresión a Notación (Animación)
+        self.pushButton_12.clicked.connect(lambda: self.iniciar_animacion_notacion("prefija"))
+        self.pushButton_10.clicked.connect(lambda: self.iniciar_animacion_notacion("infija"))
+        self.pushButton_11.clicked.connect(lambda: self.iniciar_animacion_notacion("postfija"))
 
-    def limpiar_pantalla(self):
-        self.lbl_pantalla.setText("")
-        self.scene.clear()
-        self.lbl_resultado.setText("Resultado: 0")
-        self.txt_pasos.clear()
+        # MODULO 4: Árbol a Notación
+        self.btn_PrefijaANota.clicked.connect(lambda: self.procesar_arbol_a_notacion("prefija"))
+        self.btn_infijaANota.clicked.connect(lambda: self.procesar_arbol_a_notacion("infija"))
+        self.btn_postfijaANota.clicked.connect(lambda: self.procesar_arbol_a_notacion("postfija"))
 
-    def borrar_uno(self):
-        self.lbl_pantalla.setText(self.lbl_pantalla.text()[:-1])
-        self.procesar_arbol()
+        # MODULO 5: Expresión a Código
+        self.btn_CuadruplosECodigo.clicked.connect(
+            lambda: self.procesar_codigo(self.inp_ExpCodigo.text(), "cuadruplos", self.area_res5, self.tab_1))
+        self.btn_expTriplos.clicked.connect(
+            lambda: self.procesar_codigo(self.inp_ExpCodigo.text(), "triplos", self.area_res5, self.tab_1))
+        self.btn_CodpECod.clicked.connect(
+            lambda: self.procesar_codigo(self.inp_ExpCodigo.text(), "codigop", self.area_res5, self.tab_1))
 
-    def procesar_arbol(self):
-        ecuacion = self.lbl_pantalla.text()
-        self.scene.clear()
-        self.txt_pasos.clear()  # Limpiar pasos anteriores
+        # MODULO 6: Árbol a Código
+        self.btn_CuadruplosACode.clicked.connect(lambda: self.procesar_arbol_a_codigo("cuadruplos"))
+        self.btn_TriplosACode.clicked.connect(lambda: self.procesar_arbol_a_codigo("triplos"))
+        self.btn_CodePACode.clicked.connect(lambda: self.procesar_arbol_a_codigo("codigop"))
 
-        if not ecuacion: return
+    # ==========================================
+    # LÓGICA DE PROCEDIMIENTOS (LOS 6 MÓDULOS)
+    # ==========================================
+
+    # Módulo 1: Expresión a Árbol (Tiempo real)
+    def procesar_expresion_arbol_tiempo_real(self, ecuacion):
+        if not ecuacion.strip():
+            if self.grap_GenArbol1.scene(): self.grap_GenArbol1.scene().clear()
+            self.mostrar_texto_en_scroll(self.area_Res1, "")
+            return
         try:
-            postfix = self.logica.infija_a_posfija(ecuacion)
-            raiz = self.logica.construir_arbol(postfix)
-            if raiz:
-                # EVALUAR CON PASOS
-                res, pasos = self.logica.evaluar_con_pasos(raiz)
+            tokens = re.findall(r"([a-zA-Z]+|\d+(?:\.\d+)?|[/√+*^()-])", ecuacion)
+            posfija = self.calc.infija_a_posfija(ecuacion)
+            arbol = self.calc.construir_arbol(posfija)
 
-                # Mostrar Resultado
-                if res == int(res):
-                    self.lbl_resultado.setText(f"Resultado: {int(res)}")
-                else:
-                    self.lbl_resultado.setText(f"Resultado: {res:.2f}")
+            # Dibujamos
+            escena = QGraphicsScene()
+            self.grap_GenArbol1.setScene(escena)
+            self._dibujar_nodo_interactivo(arbol, escena, 0, 0, 100)
 
-                # Mostrar Pasos
-                texto_pasos = "Procedimiento:\n"
-                for i, paso in enumerate(pasos, 1):
-                    texto_pasos += f"{i}. {paso}\n"
-                self.txt_pasos.setText(texto_pasos)
+            # PROCEDIMIENTO DETALLADO
+            proc = "⚙️ PROCEDIMIENTO:\n\n"
+            proc += f"1. Análisis Léxico (Tokens):\n   {' '.join(tokens)}\n\n"
+            proc += f"2. Algoritmo Shunting-yard (Postfija):\n   {' '.join(posfija)}\n\n"
+            proc += "3. Construcción del Árbol (Regla):\n   - Variables/Números -> Hojas\n   - Operadores -> Nodos Raíz"
+            self.mostrar_texto_en_scroll(self.area_Res1, proc)
+        except Exception:
+            pass
 
-                self.dibujar_nodo(self.scene, raiz, 0, 0, 150)
-        except:
-            pass  # Si la expresión está incompleta, simplemente no mostramos nada nuevo
+    # Módulos 2, 4 y 6: Árbol Manual y sus Procedimientos
+    def cambiar_pestana_manual(self, indice):
+        self.stackedWidget.setCurrentIndex(indice)
+        self.actualizar_vistas_arbol_manual()
 
-    # --- PESTAÑA 2 ---
-    def es_numero(self, texto):
-        try:
-            float(texto)
-            return True
-        except:
-            return False
+    def al_seleccionar_nodo(self):
+        vista = None
+        idx = self.stackedWidget.currentIndex()
+        if idx == 1:
+            vista = self.grap_Arbol2
+        elif idx == 3:
+            vista = self.grap_3
+        elif idx == 5:
+            vista = self.grap_Arbol4
 
-    def es_operador(self, texto):
-        return texto in ['+', '-', '*', '/', '^', '√']
+        if vista and vista.scene():
+            items = vista.scene().selectedItems()
+            if items:
+                self.nodo_seleccionado = self.mapa_items.get(items[0])
+                self.actualizar_vistas_arbol_manual()
 
-    def agregar_nodo_manual(self):
-        valor = self.input_valor.text().strip()
+    def agregar_nodo_manual(self, input_widget):
+        valor = input_widget.text().strip().upper()
+        input_widget.clear()
         if not valor: return
 
-        if not (self.es_numero(valor) or self.es_operador(valor)):
-            QMessageBox.warning(self, "Valor Inválido", "Ingresa número u operador válido.")
-            return
-
-        if self.raiz_editor is None:
-            self.raiz_editor = Nodo(valor)
-            self.nodo_seleccionado = self.raiz_editor
+        if self.arbol_manual is None:
+            self.arbol_manual = Nodo(valor)
+            self.nodo_seleccionado = self.arbol_manual
         elif self.nodo_seleccionado:
-            if self.es_numero(self.nodo_seleccionado.valor):
-                QMessageBox.warning(self, "Acción Inválida", "Los números no pueden tener hijos.")
+            if self.calc.es_operando(self.nodo_seleccionado.valor):
+                QMessageBox.warning(self, "Inválido", "Los números y variables son 'hojas', no pueden tener hijos.")
                 return
             if self.nodo_seleccionado.izquierda is None:
                 self.nodo_seleccionado.izquierda = Nodo(valor)
             elif self.nodo_seleccionado.derecha is None:
                 self.nodo_seleccionado.derecha = Nodo(valor)
             else:
-                QMessageBox.information(self, "Lleno", "Nodo lleno.")
+                QMessageBox.information(self, "Lleno", "El nodo ya tiene sus dos hijos.")
                 return
         else:
-            QMessageBox.warning(self, "Selección", "Selecciona un nodo padre.")
+            QMessageBox.warning(self, "Selección", "Selecciona un nodo padre haciendo clic en él.")
             return
-
-        self.input_valor.setText("")
-        self.actualizar_editor()
+        self.actualizar_vistas_arbol_manual()
 
     def eliminar_nodo_manual(self):
-        if self.nodo_seleccionado and self.raiz_editor:
-            if self.nodo_seleccionado == self.raiz_editor:
-                self.raiz_editor = None
+        if self.nodo_seleccionado and self.arbol_manual:
+            if self.nodo_seleccionado == self.arbol_manual:
+                self.arbol_manual = None
             else:
-                self.eliminar_referencia(self.raiz_editor, self.nodo_seleccionado)
+                self.eliminar_referencia(self.arbol_manual, self.nodo_seleccionado)
             self.nodo_seleccionado = None
-            self.actualizar_editor()
+            self.actualizar_vistas_arbol_manual()
 
     def eliminar_referencia(self, nodo_actual, nodo_a_borrar):
         if not nodo_actual: return
-        if nodo_actual.izquierda == nodo_a_borrar:
-            nodo_actual.izquierda = None;
-            return
-        if nodo_actual.derecha == nodo_a_borrar:
-            nodo_actual.derecha = None;
-            return
+        if nodo_actual.izquierda == nodo_a_borrar: nodo_actual.izquierda = None; return
+        if nodo_actual.derecha == nodo_a_borrar: nodo_actual.derecha = None; return
         self.eliminar_referencia(nodo_actual.izquierda, nodo_a_borrar)
         self.eliminar_referencia(nodo_actual.derecha, nodo_a_borrar)
 
-    def limpiar_editor(self):
-        self.raiz_editor = None
+    def limpiar_arbol_manual(self):
+        self.arbol_manual = None
         self.nodo_seleccionado = None
-        self.salida_expresion.setText("")
-        self.scene_editor.clear()
-        self.lbl_resultado_editor.setText("Resultado: 0")
-        self.txt_pasos_editor.clear()
+        self.actualizar_vistas_arbol_manual()
 
-    def actualizar_editor(self):
-        nodo_previo = self.nodo_seleccionado
-        try:
-            self.scene_editor.selectionChanged.disconnect()
-        except:
-            pass
-
-        self.scene_editor.clear()
+    def actualizar_vistas_arbol_manual(self):
+        for v in [self.grap_Arbol2, self.grap_3, self.grap_Arbol4]:
+            if v.scene():
+                try:
+                    v.scene().selectionChanged.disconnect()
+                except:
+                    pass
+                v.scene().clear()
         self.mapa_items = {}
 
-        self.nodo_seleccionado = nodo_previo
-        self.scene_editor.selectionChanged.connect(self.al_seleccionar_nodo)
+        # Módulo 2: Árbol a Expresión (Aquí agregamos Evaluación Matemática si aplica)
+        msg_mod2 = "Empieza agregando la Raíz del árbol."
+        msg_mod4 = "1. Construye el árbol.\n2. Haz clic en los botones de Notación."
+        msg_mod6 = "1. Construye el árbol.\n2. Haz clic en Cuádruplos/Triplos."
 
-        if self.raiz_editor:
-            self.dibujar_nodo_editor(self.raiz_editor, 0, 0, 150)
+        if self.arbol_manual:
+            idx = self.stackedWidget.currentIndex()
+            vista_activa = None
+            if idx == 1:
+                vista_activa = self.grap_Arbol2
+            elif idx == 3:
+                self.stackedWidget_3.setCurrentIndex(0)
+                vista_activa = self.grap_3
+            elif idx == 5:
+                self.stackedWidget_2.setCurrentIndex(0)
+                vista_activa = self.grap_Arbol4
+
+            if vista_activa: self.dibujar_arbol_interactivo(self.arbol_manual, vista_activa)
+
             try:
-                # MAGIA TAMBIÉN AQUÍ
-                res, pasos = self.logica.evaluar_con_pasos(self.raiz_editor)
+                # Procedimiento para Módulo 2 (Evaluación)
+                infija = " ".join(self.calc.obtener_infija(self.arbol_manual))
+                msg_mod2 = f"✅ Expresión (Recorrido Inorden):\n{infija}\n\n"
 
-                if res == int(res):
-                    self.lbl_resultado_editor.setText(f"Resultado: {int(res)}")
-                else:
-                    self.lbl_resultado_editor.setText(f"Resultado: {res:.2f}")
+                # Intentamos evaluar matemáticamente
+                res, pasos = self.calc.evaluar_con_pasos(self.arbol_manual)
+                msg_mod2 += "⚙️ PROCEDIMIENTO DE EVALUACIÓN:\n" + "\n".join(pasos) + f"\n\n🎯 RESULTADO FINAL: {res}"
+            except Exception:
+                msg_mod2 += "⚙️ PROCEDIMIENTO:\n(Expresión con variables, solo se muestra la fórmula, no se puede calcular numéricamente)."
 
-                texto_pasos = "Procedimiento:\n"
-                for i, paso in enumerate(pasos, 1):
-                    texto_pasos += f"{i}. {paso}\n"
-                self.txt_pasos_editor.setText(texto_pasos)
+        self.mostrar_texto_en_scroll(self.area_res2, msg_mod2)
+        self.mostrar_texto_en_scroll(self.area_res4,
+                                     msg_mod4 if not self.arbol_manual else "Árbol listo. Elige una notación.")
+        self.mostrar_texto_en_scroll(self.area_res6,
+                                     msg_mod6 if not self.arbol_manual else "Árbol listo. Elige generación de código.")
 
-            except:
-                self.lbl_resultado_editor.setText("Resultado: ...")
-                self.txt_pasos_editor.clear()
-        else:
-            self.lbl_resultado_editor.setText("Resultado: 0")
-            self.txt_pasos_editor.clear()
+    # Módulo 4: Árbol a Notación (Funcionalidad y Procedimiento)
+    def procesar_arbol_a_notacion(self, tipo):
+        if not self.arbol_manual:
+            QMessageBox.warning(self, "Aviso", "Primero construye un árbol.")
+            return
+        res = " ".join(getattr(self.calc, f"obtener_{tipo}")(self.arbol_manual))
 
-        self.salida_expresion.setText(self.generar_expresion(self.raiz_editor))
+        proc = f"⚙️ PROCEDIMIENTO PARA NOTACIÓN {tipo.upper()}:\n\n"
+        if tipo == "prefija":
+            proc += "Regla (Polaca): Raíz -> Izquierda -> Derecha\n"
+        elif tipo == "infija":
+            proc += "Regla: Izquierda -> Raíz -> Derecha\n"
+        elif tipo == "postfija":
+            proc += "Regla (Polaca Inversa): Izquierda -> Derecha -> Raíz\n"
 
-    def generar_expresion(self, nodo):
-        if not nodo: return ""
-        if not nodo.izquierda and not nodo.derecha: return str(nodo.valor)
-        izq = self.generar_expresion(nodo.izquierda)
-        der = self.generar_expresion(nodo.derecha)
-        return f"({izq} {nodo.valor} {der})"
+        proc += f"\n1. Se recorre el árbol gráficamente siguiendo la regla.\n2. Se extraen los nodos.\n\n🎯 RESULTADO:\n{res}"
+        self.mostrar_texto_en_scroll(self.area_res4, proc)
 
-    def al_seleccionar_nodo(self):
-        items = self.scene_editor.selectedItems()
-        self.nodo_seleccionado = self.mapa_items.get(items[0]) if items else None
+    # Módulo 6: Árbol a Código (Funcionalidad y Procedimiento)
+    def procesar_arbol_a_codigo(self, tipo):
+        if not self.arbol_manual:
+            QMessageBox.warning(self, "Aviso", "Primero construye un árbol.")
+            return
 
-    # --- DIBUJADO ---
-    def dibujar_nodo(self, escena, nodo, x, y, dx):
-        if not nodo: return
-        r = 25
-        pen = QPen(Qt.GlobalColor.black, 2)
+        postfija = self.calc.obtener_postfija(self.arbol_manual)
+        ecuacion_falsa = " ".join(postfija)
+        self.stackedWidget_2.setCurrentIndex(1)  # Cambia a la tabla
+        self.procesar_codigo(ecuacion_falsa, tipo, self.area_res6, self.tab_2, es_desde_arbol=True)
+
+    # Módulos 5 y 6: Expresión/Árbol a Código (Generación)
+    def procesar_codigo(self, ecuacion, tipo, area_res, tabla, es_desde_arbol=False):
+        if not ecuacion: return
+        try:
+            # Si viene del texto, lo pasamos a postfija. Si viene del árbol manual, ya es postfija.
+            posfija = ecuacion.split() if es_desde_arbol else self.calc.infija_a_posfija(ecuacion)
+            cod_p, triplos, cuadruplos = self.gen.generar_todo(posfija)
+
+            proc = "⚙️ PROCEDIMIENTO:\n\n"
+            proc += f"1. Extracción de Postfija:\n   {' '.join(posfija)}\n\n"
+            proc += "2. Asignación de variables temporales (T1, T2...) mediante pila.\n\n"
+
+            if tipo == "codigop":
+                self.mostrar_texto_en_scroll(area_res,
+                                             proc + "3. Traducción a Nemónicos (LOD, ADD, MUL)\n\n🎯 RESULTADO (CÓDIGO P):\n" + "\n".join(
+                                                 cod_p))
+                tabla.setRowCount(0)
+            elif tipo == "triplos":
+                datos = [[i, op, a1, a2] for i, (op, a1, a2) in enumerate(triplos)]
+                self.llenar_tabla(tabla, ["Índice", "Operador", "Arg 1", "Arg 2"], datos)
+                self.mostrar_texto_en_scroll(area_res, proc + "3. Mapeo a tabla de 3 Direcciones (Sin resultado).")
+            elif tipo == "cuadruplos":
+                datos = [[i, op, a1, a2, res] for i, (op, a1, a2, res) in enumerate(cuadruplos)]
+                self.llenar_tabla(tabla, ["Índice", "Operador", "Arg 1", "Arg 2", "Resultado"], datos)
+                self.mostrar_texto_en_scroll(area_res, proc + "3. Mapeo a tabla de 4 Direcciones (Con variables T).")
+        except Exception as e:
+            self.mostrar_texto_en_scroll(area_res, f"❌ Error:\n{str(e)}")
+
+    # Módulo 3: Expresión a Notación (Animación)
+    def iniciar_animacion_notacion(self, tipo):
+        ecuacion = self.lineEdit_3.text()
+        if not ecuacion: return
+        try:
+            posfija = self.calc.infija_a_posfija(ecuacion)
+            self.arbol_animacion = self.calc.construir_arbol(posfija)
+
+            if tipo == "prefija":
+                self.lista_animacion = self.calc.obtener_prefija(self.arbol_animacion)
+            elif tipo == "infija":
+                self.lista_animacion = self.calc.obtener_infija(self.arbol_animacion)
+            elif tipo == "postfija":
+                self.lista_animacion = self.calc.obtener_postfija(self.arbol_animacion)
+
+            self.pila_animacion = []
+            self.indice_animacion = 0
+            self.tipo_animacion = tipo
+
+            self.mostrar_texto_en_scroll(self.area_res3,
+                                         f"⚙️ PROCEDIMIENTO:\n\nIniciando recorrido {tipo.capitalize()}...\nGenerando animación de Platos y Árbol.")
+            self.timer_animacion.start(800)
+        except Exception as e:
+            pass
+
+    def paso_animacion(self):
+        if self.indice_animacion >= len(self.lista_animacion):
+            self.timer_animacion.stop()
+            self.mostrar_texto_en_scroll(self.area_res3,
+                                         f"✅ PROCEDIMIENTO FINALIZADO\n\n🎯 RESULTADO:\n{' '.join(self.pila_animacion)}")
+            self.dibujar_escena_dividida(None)
+            return
+
+        token_actual = self.lista_animacion[self.indice_animacion]
+        self.pila_animacion.append(token_actual)
+        nodo_a_resaltar = self.buscar_nodo_por_valor(self.arbol_animacion, token_actual)
+        self.dibujar_escena_dividida(nodo_a_resaltar)
+        self.mostrar_texto_en_scroll(self.area_res3,
+                                     f"⚙️ PROCEDIMIENTO:\n\nProcesando nodo: {token_actual}\n\nPila actual:\n{' '.join(self.pila_animacion)}")
+        self.indice_animacion += 1
+
+    def buscar_nodo_por_valor(self, nodo, valor):
+        if not nodo: return None
+        if nodo.valor == valor: return nodo
+        izq = self.buscar_nodo_por_valor(nodo.izquierda, valor)
+        if izq: return izq
+        return self.buscar_nodo_por_valor(nodo.derecha, valor)
+
+    # ==========================================
+    # UTILIDADES GRAFICAS
+    # ==========================================
+    def dibujar_arbol_interactivo(self, nodo_raiz, vista_grafica):
+        escena = QGraphicsScene()
+        vista_grafica.setScene(escena)
+        if nodo_raiz:
+            self._dibujar_nodo_interactivo(nodo_raiz, escena, 0, 0, 100)
+        escena.selectionChanged.connect(self.al_seleccionar_nodo)
+
+    def _dibujar_nodo_interactivo(self, nodo, escena, x, y, dx):
+        radio = 20
+        pen_linea = QPen(QColor("#6C5CE7"), 2)
         if nodo.izquierda:
-            escena.addLine(x, y, x - dx, y + 80, pen)
-            self.dibujar_nodo(escena, nodo.izquierda, x - dx, y + 80, dx / 1.6)
+            escena.addLine(x, y, x - dx, y + 60, pen_linea)
+            self._dibujar_nodo_interactivo(nodo.izquierda, escena, x - dx, y + 60, dx / 1.5)
         if nodo.derecha:
-            escena.addLine(x, y, x + dx, y + 80, pen)
-            self.dibujar_nodo(escena, nodo.derecha, x + dx, y + 80, dx / 1.6)
+            escena.addLine(x, y, x + dx, y + 60, pen_linea)
+            self._dibujar_nodo_interactivo(nodo.derecha, escena, x + dx, y + 60, dx / 1.5)
 
-        elipse = QGraphicsEllipseItem(x - r, y - r, 2 * r, 2 * r)
-        elipse.setBrush(QBrush(QColor("#0078D7")))
-        elipse.setPen(QPen(Qt.GlobalColor.white, 2))
-        escena.addItem(elipse)
-
-        txt = QGraphicsTextItem(str(nodo.valor))
-        txt.setFont(QFont("Arial", 12, QFont.Weight.Bold))
-        txt.setDefaultTextColor(Qt.GlobalColor.white)
-        txt.setPos(x - txt.boundingRect().width() / 2, y - txt.boundingRect().height() / 2)
-        escena.addItem(txt)
-
-    def dibujar_nodo_editor(self, nodo, x, y, dx):
-        if not nodo: return
-        r = 25
-        pen = QPen(Qt.GlobalColor.black, 2)
-        if nodo.izquierda:
-            self.scene_editor.addLine(x, y, x - dx, y + 80, pen)
-            self.dibujar_nodo_editor(nodo.izquierda, x - dx, y + 80, dx / 1.6)
-        if nodo.derecha:
-            self.scene_editor.addLine(x, y, x + dx, y + 80, pen)
-            self.dibujar_nodo_editor(nodo.derecha, x + dx, y + 80, dx / 1.6)
-
-        elipse = QGraphicsEllipseItem(x - r, y - r, 2 * r, 2 * r)
-        color = "#ff9800" if nodo == self.nodo_seleccionado else "#0078D7"
+        elipse = QGraphicsEllipseItem(x - radio, y - radio, radio * 2, radio * 2)
+        color = "#00E676" if nodo == self.nodo_seleccionado else "#2D2D2D"
         elipse.setBrush(QBrush(QColor(color)))
-        elipse.setPen(QPen(Qt.GlobalColor.white, 2))
+        elipse.setPen(QPen(QColor("#FFFFFF"), 2))
         elipse.setFlags(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
-        self.scene_editor.addItem(elipse)
-
+        escena.addItem(elipse)
         self.mapa_items[elipse] = nodo
 
-        txt = QGraphicsTextItem(str(nodo.valor))
-        txt.setFont(QFont("Arial", 12, QFont.Weight.Bold))
-        txt.setDefaultTextColor(Qt.GlobalColor.white)
-        txt.setPos(x - txt.boundingRect().width() / 2, y - txt.boundingRect().height() / 2)
-        txt.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
-        self.scene_editor.addItem(txt)
+        texto = QGraphicsTextItem(str(nodo.valor))
+        texto.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        texto.setDefaultTextColor(QColor("#000000" if nodo == self.nodo_seleccionado else "#FFFFFF"))
+        texto.setPos(x - texto.boundingRect().width() / 2, y - texto.boundingRect().height() / 2)
+        texto.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+        escena.addItem(texto)
+
+    def dibujar_escena_dividida(self, nodo_resaltado):
+        escena = QGraphicsScene()
+        self.graphicsView_3.setScene(escena)
+        if self.arbol_animacion:
+            self._dibujar_nodo_animado(self.arbol_animacion, escena, -100, 0, 60, nodo_resaltado)
+
+        ancho_plato = 60
+        alto_plato = 25
+        x_base = 150
+        y_base = 150
+        escena.addLine(x_base - 40, y_base + 30, x_base + 40, y_base + 30, QPen(QColor("#00E676"), 4))
+        for i, token in enumerate(self.pila_animacion):
+            y_actual = y_base - (i * (alto_plato + 5))
+            escena.addRect(x_base - ancho_plato / 2, y_actual, ancho_plato, alto_plato, QPen(QColor("#FFFFFF"), 2),
+                           QBrush(QColor("#6C5CE7")))
+            texto = escena.addText(token, QFont("Arial", 11, QFont.Weight.Bold))
+            texto.setDefaultTextColor(QColor("#FFFFFF"))
+            texto.setPos(x_base - texto.boundingRect().width() / 2, y_actual + 1)
+
+    def _dibujar_nodo_animado(self, nodo, escena, x, y, dx, nodo_resaltado):
+        radio = 18
+        pen_linea = QPen(QColor("#444444"), 2)
+        if nodo.izquierda:
+            escena.addLine(x, y, x - dx, y + 50, pen_linea)
+            self._dibujar_nodo_animado(nodo.izquierda, escena, x - dx, y + 50, dx / 1.5, nodo_resaltado)
+        if nodo.derecha:
+            escena.addLine(x, y, x + dx, y + 50, pen_linea)
+            self._dibujar_nodo_animado(nodo.derecha, escena, x + dx, y + 50, dx / 1.5, nodo_resaltado)
+        color = "#00E676" if nodo == nodo_resaltado else "#2D2D2D"
+        escena.addEllipse(x - radio, y - radio, radio * 2, radio * 2, QPen(QColor("#FFFFFF"), 2), QBrush(QColor(color)))
+        texto = escena.addText(str(nodo.valor), QFont("Arial", 11, QFont.Weight.Bold))
+        texto.setDefaultTextColor(QColor("#000000" if nodo == nodo_resaltado else "#FFFFFF"))
+        texto.setPos(x - texto.boundingRect().width() / 2, y - texto.boundingRect().height() / 2)
+
+    def llenar_tabla(self, tabla, cabeceras, datos):
+        tabla.clear()
+        tabla.setColumnCount(len(cabeceras))
+        tabla.setHorizontalHeaderLabels(cabeceras)
+        tabla.setRowCount(len(datos))
+        for fila, fila_datos in enumerate(datos):
+            for col, val in enumerate(fila_datos):
+                item = QtWidgets.QTableWidgetItem(str(val))
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                tabla.setItem(fila, col, item)
+        tabla.resizeColumnsToContents()
+
+    def aplicar_estilos_figma(self):
+        self.setStyleSheet("""
+            QMainWindow { background-color: #121212; }
+            QFrame { background-color: #1E1E1E; border: none; border-radius: 8px; }
+            QPushButton { background-color: #6C5CE7; color: white; border-radius: 6px; padding: 10px; font-weight: bold; }
+            QPushButton:hover { background-color: #5A48D2; }
+            QLineEdit { background-color: #2D2D2D; color: #FFFFFF; border: 1px solid #444; border-radius: 5px; padding: 8px; font-size: 14px; }
+            QLabel { color: #E0E0E0; font-size: 14px; font-weight: bold; }
+            QTableWidget { background-color: #1E1E1E; color: white; gridline-color: #333333; border: none; }
+            QHeaderView::section { background-color: #2D2D2D; color: white; padding: 5px; border: 1px solid #333333; font-weight: bold; }
+            QGraphicsView { background-color: #151515; border: 1px solid #333; border-radius: 5px; }
+            QScrollArea { border: none; background-color: transparent; }
+            QScrollArea > QWidget > QWidget { background-color: transparent; }
+        """)
+
+    def mostrar_texto_en_scroll(self, scroll_area, texto):
+        label = QLabel(texto)
+        label.setStyleSheet("color: #00E676; font-size: 14px; padding: 10px;")
+        label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        scroll_area.setWidget(label)
 
 
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    ventana = MiVentana()
-    ventana.show()
+    app = QtWidgets.QApplication(sys.argv)
+    window = CompiladorApp()
+    window.show()
     sys.exit(app.exec())
