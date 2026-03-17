@@ -138,7 +138,10 @@ class CompiladorApp(QtWidgets.QMainWindow):
             items = vista.scene().selectedItems()
             if items:
                 self.nodo_seleccionado = self.mapa_items.get(items[0])
-                self.actualizar_vistas_arbol_manual()
+
+                # SOLUCIÓN: Diferir la actualización para que Qt termine
+                # de procesar el evento de selección actual en la memoria de C++
+                QTimer.singleShot(0, self.actualizar_vistas_arbol_manual)
 
     def agregar_nodo_manual(self, input_widget):
         valor = input_widget.text().strip().upper()
@@ -231,23 +234,40 @@ class CompiladorApp(QtWidgets.QMainWindow):
         self.mostrar_texto_en_scroll(self.area_res6,
                                      msg_mod6 if not self.arbol_manual else "Árbol listo. Elige generación de código.")
 
-    # Módulo 4: Árbol a Notación (Funcionalidad y Procedimiento)
-    def procesar_arbol_a_notacion(self, tipo):
-        if not self.arbol_manual:
-            QMessageBox.warning(self, "Aviso", "Primero construye un árbol.")
-            return
-        res = " ".join(getattr(self.calc, f"obtener_{tipo}")(self.arbol_manual))
+        # Módulo 4: Árbol a Notación (Funcionalidad y Procedimiento Animado)
+        def procesar_arbol_a_notacion(self, tipo):
+            if not self.arbol_manual:
+                QMessageBox.warning(self, "Aviso", "Primero construye un árbol.")
+                return
 
-        proc = f"⚙️ PROCEDIMIENTO PARA NOTACIÓN {tipo.upper()}:\n\n"
-        if tipo == "prefija":
-            proc += "Regla (Polaca): Raíz -> Izquierda -> Derecha\n"
-        elif tipo == "infija":
-            proc += "Regla: Izquierda -> Raíz -> Derecha\n"
-        elif tipo == "postfija":
-            proc += "Regla (Polaca Inversa): Izquierda -> Derecha -> Raíz\n"
+            # 1. Cambiamos la sub-ventana a "Generación de platos" (índice 1 de stackedWidget_3)
+            self.stackedWidget_3.setCurrentIndex(1)
 
-        proc += f"\n1. Se recorre el árbol gráficamente siguiendo la regla.\n2. Se extraen los nodos.\n\n🎯 RESULTADO:\n{res}"
-        self.mostrar_texto_en_scroll(self.area_res4, proc)
+            # 2. Obtenemos el recorrido dependiendo del botón presionado
+            if tipo == "prefija":
+                self.lista_animacion = self.calc.obtener_prefija(self.arbol_manual)
+            elif tipo == "infija":
+                self.lista_animacion = self.calc.obtener_infija(self.arbol_manual)
+            elif tipo == "postfija":
+                self.lista_animacion = self.calc.obtener_postfija(self.arbol_manual)
+
+            # 3. Preparamos las variables de la animación
+            self.pila_animacion = []
+            self.indice_animacion = 0
+            self.modo_animacion = "arbol"  # Etiqueta para que el QTimer sepa qué actualizar
+
+            # 4. Preparamos visualmente la tabla (Pila de Platos)
+            self.tableWidget.clear()
+            self.tableWidget.setColumnCount(1)
+            self.tableWidget.setHorizontalHeaderLabels(["Pila (Platos)"])
+            self.tableWidget.setRowCount(0)
+            self.tableWidget.horizontalHeader().setStretchLastSection(True)
+
+            self.mostrar_texto_en_scroll(self.area_res4,
+                                         f"⚙️ PROCEDIMIENTO:\n\nIniciando recorrido {tipo.capitalize()}...\nInsertando nodos en la Pila de Platos.")
+
+            # 5. Iniciamos la animación
+            self.timer_animacion.start(800)
 
     # Módulo 6: Árbol a Código (Funcionalidad y Procedimiento)
     def procesar_arbol_a_codigo(self, tipo):
@@ -309,24 +329,52 @@ class CompiladorApp(QtWidgets.QMainWindow):
 
             self.mostrar_texto_en_scroll(self.area_res3,
                                          f"⚙️ PROCEDIMIENTO:\n\nIniciando recorrido {tipo.capitalize()}...\nGenerando animación de Platos y Árbol.")
+            self.modo_animacion = "expresion"
             self.timer_animacion.start(800)
         except Exception as e:
             pass
 
     def paso_animacion(self):
+        # Por defecto asume que es la animación del módulo 3 si no existe la etiqueta
+        modo = getattr(self, "modo_animacion", "expresion")
+
         if self.indice_animacion >= len(self.lista_animacion):
             self.timer_animacion.stop()
-            self.mostrar_texto_en_scroll(self.area_res3,
-                                         f"✅ PROCEDIMIENTO FINALIZADO\n\n🎯 RESULTADO:\n{' '.join(self.pila_animacion)}")
-            self.dibujar_escena_dividida(None)
+            msg = f"✅ PROCEDIMIENTO FINALIZADO\n\n🎯 RESULTADO:\n{' '.join(self.pila_animacion)}"
+            if modo == "expresion":
+                self.mostrar_texto_en_scroll(self.area_res3, msg)
+                self.dibujar_escena_dividida(None)
+            else:
+                self.mostrar_texto_en_scroll(self.area_res4, msg)
             return
 
         token_actual = self.lista_animacion[self.indice_animacion]
         self.pila_animacion.append(token_actual)
-        nodo_a_resaltar = self.buscar_nodo_por_valor(self.arbol_animacion, token_actual)
-        self.dibujar_escena_dividida(nodo_a_resaltar)
-        self.mostrar_texto_en_scroll(self.area_res3,
-                                     f"⚙️ PROCEDIMIENTO:\n\nProcesando nodo: {token_actual}\n\nPila actual:\n{' '.join(self.pila_animacion)}")
+
+        if modo == "expresion":
+            # Animación original del Módulo 3
+            nodo_a_resaltar = self.buscar_nodo_por_valor(self.arbol_animacion, token_actual)
+            self.dibujar_escena_dividida(nodo_a_resaltar)
+            self.mostrar_texto_en_scroll(self.area_res3,
+                                         f"⚙️ PROCEDIMIENTO:\n\nProcesando nodo: {token_actual}\n\nPila actual:\n{' '.join(self.pila_animacion)}")
+        else:
+            # Nueva animación en forma de Pila para el Módulo 4
+            self.tableWidget.setRowCount(len(self.pila_animacion))
+
+            # reversed() hace que el último en entrar quede visualmente arriba (Tope de la pila)
+            for i, token in enumerate(reversed(self.pila_animacion)):
+                item = QtWidgets.QTableWidgetItem(str(token))
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+
+                # Le damos estilo visual de "plato" usando tus colores
+                item.setBackground(QColor("#6C5CE7"))
+                item.setForeground(QColor("#FFFFFF"))
+                item.setFont(QFont("Arial", 11, QFont.Weight.Bold))
+                self.tableWidget.setItem(i, 0, item)
+
+            self.mostrar_texto_en_scroll(self.area_res4,
+                                         f"⚙️ PROCEDIMIENTO:\n\nProcesando nodo: {token_actual}\n\nSe inserta en el tope de la Pila.")
+
         self.indice_animacion += 1
 
     def buscar_nodo_por_valor(self, nodo, valor):
