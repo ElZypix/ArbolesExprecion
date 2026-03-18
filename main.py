@@ -33,6 +33,7 @@ class CompiladorApp(QtWidgets.QMainWindow):
         self.indice_animacion = 0
         self.tipo_animacion = ""
         self.arbol_animacion = None
+        self.modo_animacion = "expresion"
 
         self.aplicar_estilos_figma()
 
@@ -138,9 +139,6 @@ class CompiladorApp(QtWidgets.QMainWindow):
             items = vista.scene().selectedItems()
             if items:
                 self.nodo_seleccionado = self.mapa_items.get(items[0])
-
-                # SOLUCIÓN: Diferir la actualización para que Qt termine
-                # de procesar el evento de selección actual en la memoria de C++
                 QTimer.singleShot(0, self.actualizar_vistas_arbol_manual)
 
     def agregar_nodo_manual(self, input_widget):
@@ -198,7 +196,6 @@ class CompiladorApp(QtWidgets.QMainWindow):
                 v.scene().clear()
         self.mapa_items = {}
 
-        # Módulo 2: Árbol a Expresión (Aquí agregamos Evaluación Matemática si aplica)
         msg_mod2 = "Empieza agregando la Raíz del árbol."
         msg_mod4 = "1. Construye el árbol.\n2. Haz clic en los botones de Notación."
         msg_mod6 = "1. Construye el árbol.\n2. Haz clic en Cuádruplos/Triplos."
@@ -218,11 +215,9 @@ class CompiladorApp(QtWidgets.QMainWindow):
             if vista_activa: self.dibujar_arbol_interactivo(self.arbol_manual, vista_activa)
 
             try:
-                # Procedimiento para Módulo 2 (Evaluación)
                 infija = " ".join(self.calc.obtener_infija(self.arbol_manual))
                 msg_mod2 = f"✅ Expresión (Recorrido Inorden):\n{infija}\n\n"
 
-                # Intentamos evaluar matemáticamente
                 res, pasos = self.calc.evaluar_con_pasos(self.arbol_manual)
                 msg_mod2 += "⚙️ PROCEDIMIENTO DE EVALUACIÓN:\n" + "\n".join(pasos) + f"\n\n🎯 RESULTADO FINAL: {res}"
             except Exception:
@@ -234,40 +229,36 @@ class CompiladorApp(QtWidgets.QMainWindow):
         self.mostrar_texto_en_scroll(self.area_res6,
                                      msg_mod6 if not self.arbol_manual else "Árbol listo. Elige generación de código.")
 
-        # Módulo 4: Árbol a Notación (Funcionalidad y Procedimiento Animado)
-        def procesar_arbol_a_notacion(self, tipo):
-            if not self.arbol_manual:
-                QMessageBox.warning(self, "Aviso", "Primero construye un árbol.")
-                return
+    # Módulo 4: Árbol a Notación (¡AHORA CON ANIMACIÓN EN QGRAPHICSVIEW!)
+    def procesar_arbol_a_notacion(self, tipo):
+        if not self.arbol_manual:
+            QMessageBox.warning(self, "Aviso", "Primero construye un árbol.")
+            return
 
-            # 1. Cambiamos la sub-ventana a "Generación de platos" (índice 1 de stackedWidget_3)
-            self.stackedWidget_3.setCurrentIndex(1)
+        # Cambiamos a la vista donde está grap_ANotacion2
+        self.stackedWidget_3.setCurrentIndex(1)
 
-            # 2. Obtenemos el recorrido dependiendo del botón presionado
-            if tipo == "prefija":
-                self.lista_animacion = self.calc.obtener_prefija(self.arbol_manual)
-            elif tipo == "infija":
-                self.lista_animacion = self.calc.obtener_infija(self.arbol_manual)
-            elif tipo == "postfija":
-                self.lista_animacion = self.calc.obtener_postfija(self.arbol_manual)
+        if tipo == "prefija":
+            self.lista_animacion = self.calc.obtener_prefija(self.arbol_manual)
+        elif tipo == "infija":
+            self.lista_animacion = self.calc.obtener_infija(self.arbol_manual)
+        elif tipo == "postfija":
+            self.lista_animacion = self.calc.obtener_postfija(self.arbol_manual)
 
-            # 3. Preparamos las variables de la animación
-            self.pila_animacion = []
-            self.indice_animacion = 0
-            self.modo_animacion = "arbol"  # Etiqueta para que el QTimer sepa qué actualizar
+        self.pila_animacion = []
+        self.indice_animacion = 0
+        self.tipo_animacion = tipo
+        self.modo_animacion = "arbol"  # Le decimos al timer que es la animación del Módulo 4
 
-            # 4. Preparamos visualmente la tabla (Pila de Platos)
-            self.tableWidget.clear()
-            self.tableWidget.setColumnCount(1)
-            self.tableWidget.setHorizontalHeaderLabels(["Pila (Platos)"])
-            self.tableWidget.setRowCount(0)
-            self.tableWidget.horizontalHeader().setStretchLastSection(True)
+        # Limpiamos el GraphicsView de platos antes de empezar
+        if self.grap_ANotacion2.scene():
+            self.grap_ANotacion2.scene().clear()
 
-            self.mostrar_texto_en_scroll(self.area_res4,
-                                         f"⚙️ PROCEDIMIENTO:\n\nIniciando recorrido {tipo.capitalize()}...\nInsertando nodos en la Pila de Platos.")
+        self.mostrar_texto_en_scroll(self.area_res4,
+                                     f"⚙️ PROCEDIMIENTO:\n\nIniciando recorrido {tipo.capitalize()}...\nGenerando animación de Platos.")
 
-            # 5. Iniciamos la animación
-            self.timer_animacion.start(800)
+        # Iniciamos animación
+        self.timer_animacion.start(800)
 
     # Módulo 6: Árbol a Código (Funcionalidad y Procedimiento)
     def procesar_arbol_a_codigo(self, tipo):
@@ -277,14 +268,13 @@ class CompiladorApp(QtWidgets.QMainWindow):
 
         postfija = self.calc.obtener_postfija(self.arbol_manual)
         ecuacion_falsa = " ".join(postfija)
-        self.stackedWidget_2.setCurrentIndex(1)  # Cambia a la tabla
+        self.stackedWidget_2.setCurrentIndex(1)
         self.procesar_codigo(ecuacion_falsa, tipo, self.area_res6, self.tab_2, es_desde_arbol=True)
 
     # Módulos 5 y 6: Expresión/Árbol a Código (Generación)
     def procesar_codigo(self, ecuacion, tipo, area_res, tabla, es_desde_arbol=False):
         if not ecuacion: return
         try:
-            # Si viene del texto, lo pasamos a postfija. Si viene del árbol manual, ya es postfija.
             posfija = ecuacion.split() if es_desde_arbol else self.calc.infija_a_posfija(ecuacion)
             cod_p, triplos, cuadruplos = self.gen.generar_todo(posfija)
 
@@ -326,54 +316,44 @@ class CompiladorApp(QtWidgets.QMainWindow):
             self.pila_animacion = []
             self.indice_animacion = 0
             self.tipo_animacion = tipo
+            self.modo_animacion = "expresion"  # Le decimos al timer que es la animación del Módulo 3
 
             self.mostrar_texto_en_scroll(self.area_res3,
                                          f"⚙️ PROCEDIMIENTO:\n\nIniciando recorrido {tipo.capitalize()}...\nGenerando animación de Platos y Árbol.")
-            self.modo_animacion = "expresion"
             self.timer_animacion.start(800)
         except Exception as e:
             pass
 
+    # ==========================================
+    # LÓGICA DEL TEMPORIZADOR DE ANIMACIONES
+    # ==========================================
     def paso_animacion(self):
-        # Por defecto asume que es la animación del módulo 3 si no existe la etiqueta
-        modo = getattr(self, "modo_animacion", "expresion")
-
         if self.indice_animacion >= len(self.lista_animacion):
             self.timer_animacion.stop()
             msg = f"✅ PROCEDIMIENTO FINALIZADO\n\n🎯 RESULTADO:\n{' '.join(self.pila_animacion)}"
-            if modo == "expresion":
+
+            if self.modo_animacion == "expresion":
                 self.mostrar_texto_en_scroll(self.area_res3, msg)
                 self.dibujar_escena_dividida(None)
             else:
                 self.mostrar_texto_en_scroll(self.area_res4, msg)
+                self.dibujar_platos_solos(self.grap_ANotacion2)
             return
 
         token_actual = self.lista_animacion[self.indice_animacion]
         self.pila_animacion.append(token_actual)
 
-        if modo == "expresion":
-            # Animación original del Módulo 3
+        if self.modo_animacion == "expresion":
+            # Animación original del Módulo 3 (Árbol y Platos)
             nodo_a_resaltar = self.buscar_nodo_por_valor(self.arbol_animacion, token_actual)
             self.dibujar_escena_dividida(nodo_a_resaltar)
             self.mostrar_texto_en_scroll(self.area_res3,
                                          f"⚙️ PROCEDIMIENTO:\n\nProcesando nodo: {token_actual}\n\nPila actual:\n{' '.join(self.pila_animacion)}")
         else:
-            # Nueva animación en forma de Pila para el Módulo 4
-            self.tableWidget.setRowCount(len(self.pila_animacion))
-
-            # reversed() hace que el último en entrar quede visualmente arriba (Tope de la pila)
-            for i, token in enumerate(reversed(self.pila_animacion)):
-                item = QtWidgets.QTableWidgetItem(str(token))
-                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-
-                # Le damos estilo visual de "plato" usando tus colores
-                item.setBackground(QColor("#6C5CE7"))
-                item.setForeground(QColor("#FFFFFF"))
-                item.setFont(QFont("Arial", 11, QFont.Weight.Bold))
-                self.tableWidget.setItem(i, 0, item)
-
+            # Nueva animación Módulo 4 (Solo Platos)
+            self.dibujar_platos_solos(self.grap_ANotacion2)
             self.mostrar_texto_en_scroll(self.area_res4,
-                                         f"⚙️ PROCEDIMIENTO:\n\nProcesando nodo: {token_actual}\n\nSe inserta en el tope de la Pila.")
+                                         f"⚙️ PROCEDIMIENTO:\n\nProcesando nodo: {token_actual}\n\nAgregando al tope de la Pila.")
 
         self.indice_animacion += 1
 
@@ -437,6 +417,28 @@ class CompiladorApp(QtWidgets.QMainWindow):
             texto = escena.addText(token, QFont("Arial", 11, QFont.Weight.Bold))
             texto.setDefaultTextColor(QColor("#FFFFFF"))
             texto.setPos(x_base - texto.boundingRect().width() / 2, y_actual + 1)
+
+    # NUEVA FUNCIÓN: Dibuja solo los platos centrados para el Módulo 4
+    def dibujar_platos_solos(self, vista):
+        escena = QGraphicsScene()
+        vista.setScene(escena)
+
+        ancho_plato = 80
+        alto_plato = 30
+        x_base = 0  # Lo centramos en la vista
+        y_base = 120  # Lo bajamos un poco para que la pila suba
+
+        # Base de la pila (Línea verde)
+        escena.addLine(x_base - 60, y_base + 35, x_base + 60, y_base + 35, QPen(QColor("#00E676"), 4))
+
+        # Dibujamos cada plato desde la base hacia arriba
+        for i, token in enumerate(self.pila_animacion):
+            y_actual = y_base - (i * (alto_plato + 5))
+            escena.addRect(x_base - ancho_plato / 2, y_actual, ancho_plato, alto_plato, QPen(QColor("#FFFFFF"), 2),
+                           QBrush(QColor("#6C5CE7")))
+            texto = escena.addText(token, QFont("Arial", 12, QFont.Weight.Bold))
+            texto.setDefaultTextColor(QColor("#FFFFFF"))
+            texto.setPos(x_base - texto.boundingRect().width() / 2, y_actual + 2)
 
     def _dibujar_nodo_animado(self, nodo, escena, x, y, dx, nodo_resaltado):
         radio = 18

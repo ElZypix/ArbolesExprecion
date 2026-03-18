@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1183</width>
-    <height>653</height>
+    <width>1161</width>
+    <height>684</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -297,8 +297,8 @@
                   <rect>
                    <x>0</x>
                    <y>0</y>
-                   <width>383</width>
-                   <height>495</height>
+                   <width>375</width>
+                   <height>527</height>
                   </rect>
                  </property>
                 </widget>
@@ -606,7 +606,7 @@
                    </widget>
                   </item>
                   <item>
-                   <widget class="QTableWidget" name="tableWidget"/>
+                   <widget class="QGraphicsView" name="grap_ANotacion2"/>
                   </item>
                  </layout>
                 </widget>
@@ -702,8 +702,8 @@
                   <rect>
                    <x>0</x>
                    <y>0</y>
-                   <width>383</width>
-                   <height>473</height>
+                   <width>98</width>
+                   <height>28</height>
                   </rect>
                  </property>
                 </widget>
@@ -870,8 +870,8 @@
                      <rect>
                       <x>0</x>
                       <y>0</y>
-                      <width>382</width>
-                      <height>409</height>
+                      <width>98</width>
+                      <height>28</height>
                      </rect>
                     </property>
                    </widget>
