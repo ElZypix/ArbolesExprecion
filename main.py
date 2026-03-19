@@ -282,9 +282,6 @@ class CompiladorApp(QtWidgets.QMainWindow):
             proc += f"1. Extracción de Postfija:\n   {' '.join(posfija)}\n\n"
             proc += "2. Asignación de variables temporales (T1, T2...) mediante pila.\n\n"
 
-            ecuacion_original = " ".join(self.calc.obtener_infija(self.arbol_manual)) if es_desde_arbol else ecuacion
-            reporte_conteo = self.lexico.generar_reporte_texto(ecuacion_original)
-
             if tipo == "codigop":
                 self.mostrar_texto_en_scroll(area_res,
                                              proc + "3. Traducción a Nemónicos (LOD, ADD, MUL)\n\n🎯 RESULTADO (CÓDIGO P):\n" + "\n".join(
