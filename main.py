@@ -107,6 +107,13 @@ class CompiladorApp(QtWidgets.QMainWindow):
             proc += f"1. Análisis Léxico (Tokens):\n   {' '.join(tokens)}\n\n"
             proc += f"2. Algoritmo Shunting-yard (Postfija):\n   {' '.join(posfija)}\n\n"
             proc += "3. Construcción del Árbol (Regla):\n   - Variables/Números -> Hojas\n   - Operadores -> Nodos Raíz"
+            try:
+                res_eval, pasos = self.calc.evaluar_con_pasos(arbol)
+                if pasos:
+                    proc += "\n\n⚙️ PROCEDIMIENTO PASO A PASO:\n" + "\n".join(
+                        pasos) + f"\n\n🎯 RESULTADO MATEMÁTICO:\n{res_eval}"
+            except Exception:
+                pass
             # CONTEO MODULO 1
             proc += self.lexico.generar_reporte_texto(ecuacion)
             self.mostrar_texto_en_scroll(self.area_Res1, proc)
@@ -231,23 +238,39 @@ class CompiladorApp(QtWidgets.QMainWindow):
         self.mostrar_texto_en_scroll(self.area_res6,
                                      msg_mod6 if not self.arbol_manual else "Árbol listo. Elige generación de código.")
 
-    # ==========================================
-    # MODULOS 3 y 4 (Notaciones)
-    # ==========================================
+        # ==========================================
+        # MODULOS 3 y 4 (Notaciones)
+        # ==========================================
     def procesar_arbol_a_notacion(self, tipo):
         if not self.arbol_manual:
             QMessageBox.warning(self, "Aviso", "Primero construye un árbol.")
             return
+
+        tipo = tipo.lower()
         res = " ".join(getattr(self.calc, f"obtener_{tipo}")(self.arbol_manual))
         infija = " ".join(self.calc.obtener_infija(self.arbol_manual))
+
         proc = f"⚙️ PROCEDIMIENTO PARA NOTACIÓN {tipo.upper()}:\n\n"
+
         if tipo == "prefija":
+
             proc += "Regla (Polaca): Raíz -> Izquierda -> Derecha\n"
         elif tipo == "infija":
             proc += "Regla: Izquierda -> Raíz -> Derecha\n"
         elif tipo == "postfija":
             proc += "Regla (Polaca Inversa): Izquierda -> Derecha -> Raíz\n"
+
         proc += f"\n1. Se recorre el árbol gráficamente...\n\n🎯 RESULTADO:\n{res}"
+
+        # --- EVALUACIÓN MATEMÁTICA PASO A PASO ---
+        try:
+            res_eval, pasos = self.calc.evaluar_con_pasos(self.arbol_manual)
+            if pasos:
+                proc += "\n\n⚙️ PROCEDIMIENTO PASO A PASO:\n" + "\n".join(
+                        pasos) + f"\n\n🎯 RESULTADO MATEMÁTICO:\n{res_eval}"
+        except Exception as e:
+            proc += f"\n\n⚙️ PROCEDIMIENTO:\nNo se pudo evaluar matemáticamente: {str(e)}"
+            # ----------------------------------------
 
         # CONTEO MODULO 4
         proc += self.lexico.generar_reporte_texto(infija)
@@ -278,6 +301,20 @@ class CompiladorApp(QtWidgets.QMainWindow):
         if self.indice_animacion >= len(self.lista_animacion):
             self.timer_animacion.stop()
             res_texto = f"✅ PROCEDIMIENTO FINALIZADO\n\n🎯 RESULTADO:\n{' '.join(self.pila_animacion)}"
+            try:
+                res_eval, pasos = self.calc.evaluar_con_pasos(self.arbol_animacion)
+                if pasos:
+                    res_texto += "\n\n⚙️ PROCEDIMIENTO PASO A PASO:\n" + "\n".join(
+                        pasos) + f"\n\n🎯 RESULTADO MATEMÁTICO:\n{res_eval}"
+            except Exception:
+                pass
+            try:
+                res_eval, pasos = self.calc.evaluar_con_pasos(self.arbol_animacion)
+                if pasos:
+                    res_texto += "\n\n⚙️ PROCEDIMIENTO PASO A PASO:\n" + "\n".join(
+                        pasos) + f"\n\n🎯 RESULTADO MATEMÁTICO:\n{res_eval}"
+            except Exception:
+                pass
             # CONTEO MODULO 3
             res_texto += self.lexico.generar_reporte_texto(self.ecuacion_animacion)
             self.mostrar_texto_en_scroll(self.area_res3, res_texto)
@@ -320,6 +357,16 @@ class CompiladorApp(QtWidgets.QMainWindow):
             proc = "⚙️ PROCEDIMIENTO:\n\n"
             proc += f"1. Extracción de Postfija:\n   {' '.join(posfija)}\n\n"
             proc += "2. Asignación de variables temporales (T1, T2...) mediante pila.\n\n"
+
+            try:
+                # Si viene del módulo 6 usamos el arbol manual, si viene del 5 construimos uno temporal
+                arbol_temp = self.arbol_manual if es_desde_arbol else self.calc.construir_arbol(posfija)
+                res_eval, pasos = self.calc.evaluar_con_pasos(arbol_temp)
+                if pasos:
+                    proc += "\n⚙️ PROCEDIMIENTO PASO A PASO MATEMÁTICO:\n" + "\n".join(
+                        pasos) + f"\n\n🎯 RESULTADO MATEMÁTICO: {res_eval}\n"
+            except Exception:
+                pass
 
             # CONTEO MODULO 5 Y 6
             ecuacion_original = " ".join(self.calc.obtener_infija(self.arbol_manual)) if es_desde_arbol else ecuacion
