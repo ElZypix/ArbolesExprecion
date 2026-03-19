@@ -19,13 +19,12 @@ class CompiladorApp(QtWidgets.QMainWindow):
         self.calc = CalculadoraArbol()
         self.gen = GeneradorCodigo()
         self.lexico = AnalizadorLexico()
+        self.lexico.imprimir_reporte_consola()
 
-        # Variables Globales para el Árbol Manual (Anti-Crasheos)
         self.arbol_manual = None
         self.nodo_seleccionado = None
         self.mapa_items = {}
 
-        # Variables para Animación
         self.timer_animacion = QTimer()
         self.timer_animacion.timeout.connect(self.paso_animacion)
         self.lista_animacion = []
@@ -33,7 +32,7 @@ class CompiladorApp(QtWidgets.QMainWindow):
         self.indice_animacion = 0
         self.tipo_animacion = ""
         self.arbol_animacion = None
-        self.modo_animacion = "expresion"
+        self.ecuacion_animacion = ""  # Guarda la ecuacion para el conteo final
 
         self.aplicar_estilos_figma()
 
@@ -45,30 +44,26 @@ class CompiladorApp(QtWidgets.QMainWindow):
         self.btn_Ecodigo.clicked.connect(lambda: self.stackedWidget.setCurrentIndex(4))
         self.btn_ACodigo.clicked.connect(lambda: self.cambiar_pestana_manual(5))
 
-        # ==========================================
-        # CONEXIONES DE EVENTOS
-        # ==========================================
         # MODULO 1: Expresión a Árbol
         self.inp_Exp.textChanged.connect(self.procesar_expresion_arbol_tiempo_real)
 
-        # MÓDULOS MANUALES (2, 4 y 6) -> Comparten el mismo árbol
-        # Pag 2
+        # MÓDULOS MANUALES
         self.btn_agregarAexp.clicked.connect(lambda: self.agregar_nodo_manual(self.inp_nod))
         self.btn_EliminarAexp.clicked.connect(self.eliminar_nodo_manual)
         self.btn_limpiarAexp.clicked.connect(self.limpiar_arbol_manual)
         self.inp_nod.returnPressed.connect(lambda: self.agregar_nodo_manual(self.inp_nod))
-        # Pag 4
+
         self.btn_AgregarANota.clicked.connect(lambda: self.agregar_nodo_manual(self.int_NodoANota))
         self.btn_EliminarANota.clicked.connect(self.eliminar_nodo_manual)
         self.btn_LimpiarANota.clicked.connect(self.limpiar_arbol_manual)
         self.int_NodoANota.returnPressed.connect(lambda: self.agregar_nodo_manual(self.int_NodoANota))
-        # Pag 6
+
         self.btn_AgregarACode.clicked.connect(lambda: self.agregar_nodo_manual(self.inp_ACode))
         self.btn_EliminarACode.clicked.connect(self.eliminar_nodo_manual)
         self.btn_LimpiarACode.clicked.connect(self.limpiar_arbol_manual)
         self.inp_ACode.returnPressed.connect(lambda: self.agregar_nodo_manual(self.inp_ACode))
 
-        # MODULO 3: Expresión a Notación (Animación)
+        # MODULO 3: Expresión a Notación
         self.pushButton_12.clicked.connect(lambda: self.iniciar_animacion_notacion("prefija"))
         self.pushButton_10.clicked.connect(lambda: self.iniciar_animacion_notacion("infija"))
         self.pushButton_11.clicked.connect(lambda: self.iniciar_animacion_notacion("postfija"))
@@ -92,10 +87,8 @@ class CompiladorApp(QtWidgets.QMainWindow):
         self.btn_CodePACode.clicked.connect(lambda: self.procesar_arbol_a_codigo("codigop"))
 
     # ==========================================
-    # LÓGICA DE PROCEDIMIENTOS (LOS 6 MÓDULOS)
+    # MODULO 1
     # ==========================================
-
-    # Módulo 1: Expresión a Árbol (Tiempo real)
     def procesar_expresion_arbol_tiempo_real(self, ecuacion):
         if not ecuacion.strip():
             if self.grap_GenArbol1.scene(): self.grap_GenArbol1.scene().clear()
@@ -106,21 +99,23 @@ class CompiladorApp(QtWidgets.QMainWindow):
             posfija = self.calc.infija_a_posfija(ecuacion)
             arbol = self.calc.construir_arbol(posfija)
 
-            # Dibujamos
             escena = QGraphicsScene()
             self.grap_GenArbol1.setScene(escena)
             self._dibujar_nodo_interactivo(arbol, escena, 0, 0, 100)
 
-            # PROCEDIMIENTO DETALLADO
             proc = "⚙️ PROCEDIMIENTO:\n\n"
             proc += f"1. Análisis Léxico (Tokens):\n   {' '.join(tokens)}\n\n"
             proc += f"2. Algoritmo Shunting-yard (Postfija):\n   {' '.join(posfija)}\n\n"
             proc += "3. Construcción del Árbol (Regla):\n   - Variables/Números -> Hojas\n   - Operadores -> Nodos Raíz"
+            # CONTEO MODULO 1
+            proc += self.lexico.generar_reporte_texto(ecuacion)
             self.mostrar_texto_en_scroll(self.area_Res1, proc)
         except Exception:
             pass
 
-    # Módulos 2, 4 y 6: Árbol Manual y sus Procedimientos
+    # ==========================================
+    # CONSTRUCCIÓN MANUAL (Módulos 2, 4 y 6)
+    # ==========================================
     def cambiar_pestana_manual(self, indice):
         self.stackedWidget.setCurrentIndex(indice)
         self.actualizar_vistas_arbol_manual()
@@ -138,14 +133,18 @@ class CompiladorApp(QtWidgets.QMainWindow):
         if vista and vista.scene():
             items = vista.scene().selectedItems()
             if items:
+                # 1. Registramos qué nodo seleccionó el usuario
                 self.nodo_seleccionado = self.mapa_items.get(items[0])
-                QTimer.singleShot(0, self.actualizar_vistas_arbol_manual)
+
+                # 2. ¡EL SALVAVIDAS! (Anti-Crasheo 0xC0000005)
+                # Retrasamos el redibujado 10 milisegundos para que PyQt6 termine
+                # de procesar el clic en memoria antes de que destruyamos la escena.
+                QTimer.singleShot(10, self.actualizar_vistas_arbol_manual)
 
     def agregar_nodo_manual(self, input_widget):
         valor = input_widget.text().strip().upper()
         input_widget.clear()
         if not valor: return
-
         if self.arbol_manual is None:
             self.arbol_manual = Nodo(valor)
             self.nodo_seleccionado = self.arbol_manual
@@ -211,17 +210,20 @@ class CompiladorApp(QtWidgets.QMainWindow):
             elif idx == 5:
                 self.stackedWidget_2.setCurrentIndex(0)
                 vista_activa = self.grap_Arbol4
-
             if vista_activa: self.dibujar_arbol_interactivo(self.arbol_manual, vista_activa)
 
             try:
                 infija = " ".join(self.calc.obtener_infija(self.arbol_manual))
-                msg_mod2 = f"✅ Expresión (Recorrido Inorden):\n{infija}\n\n"
+                msg_mod2 = f"✅ Expresión original (Inorden):\n{infija}\n\n"
 
                 res, pasos = self.calc.evaluar_con_pasos(self.arbol_manual)
-                msg_mod2 += "⚙️ PROCEDIMIENTO DE EVALUACIÓN:\n" + "\n".join(pasos) + f"\n\n🎯 RESULTADO FINAL: {res}"
-            except Exception:
-                msg_mod2 += "⚙️ PROCEDIMIENTO:\n(Expresión con variables, solo se muestra la fórmula, no se puede calcular numéricamente)."
+                if pasos: msg_mod2 += "⚙️ PROCEDIMIENTO PASO A PASO:\n" + "\n".join(pasos)
+
+                msg_mod2 += f"\n\n🎯 RESULTADO FINAL:\n{res}"
+                # CONTEO MODULO 2
+                msg_mod2 += self.lexico.generar_reporte_texto(infija)
+            except Exception as e:
+                msg_mod2 += f"⚙️ PROCEDIMIENTO:\nError al evaluar: {e}"
 
         self.mostrar_texto_en_scroll(self.area_res2, msg_mod2)
         self.mostrar_texto_en_scroll(self.area_res4,
@@ -229,132 +231,65 @@ class CompiladorApp(QtWidgets.QMainWindow):
         self.mostrar_texto_en_scroll(self.area_res6,
                                      msg_mod6 if not self.arbol_manual else "Árbol listo. Elige generación de código.")
 
-    # Módulo 4: Árbol a Notación (¡AHORA CON ANIMACIÓN EN QGRAPHICSVIEW!)
+    # ==========================================
+    # MODULOS 3 y 4 (Notaciones)
+    # ==========================================
     def procesar_arbol_a_notacion(self, tipo):
         if not self.arbol_manual:
             QMessageBox.warning(self, "Aviso", "Primero construye un árbol.")
             return
-
-        # Cambiamos a la vista donde está grap_ANotacion2
-        self.stackedWidget_3.setCurrentIndex(1)
-
+        res = " ".join(getattr(self.calc, f"obtener_{tipo}")(self.arbol_manual))
+        infija = " ".join(self.calc.obtener_infija(self.arbol_manual))
+        proc = f"⚙️ PROCEDIMIENTO PARA NOTACIÓN {tipo.upper()}:\n\n"
         if tipo == "prefija":
-            self.lista_animacion = self.calc.obtener_prefija(self.arbol_manual)
+            proc += "Regla (Polaca): Raíz -> Izquierda -> Derecha\n"
         elif tipo == "infija":
-            self.lista_animacion = self.calc.obtener_infija(self.arbol_manual)
+            proc += "Regla: Izquierda -> Raíz -> Derecha\n"
         elif tipo == "postfija":
-            self.lista_animacion = self.calc.obtener_postfija(self.arbol_manual)
+            proc += "Regla (Polaca Inversa): Izquierda -> Derecha -> Raíz\n"
+        proc += f"\n1. Se recorre el árbol gráficamente...\n\n🎯 RESULTADO:\n{res}"
 
-        self.pila_animacion = []
-        self.indice_animacion = 0
-        self.tipo_animacion = tipo
-        self.modo_animacion = "arbol"  # Le decimos al timer que es la animación del Módulo 4
+        # CONTEO MODULO 4
+        proc += self.lexico.generar_reporte_texto(infija)
+        self.mostrar_texto_en_scroll(self.area_res4, proc)
 
-        # Limpiamos el GraphicsView de platos antes de empezar
-        if self.grap_ANotacion2.scene():
-            self.grap_ANotacion2.scene().clear()
-
-        self.mostrar_texto_en_scroll(self.area_res4,
-                                     f"⚙️ PROCEDIMIENTO:\n\nIniciando recorrido {tipo.capitalize()}...\nGenerando animación de Platos.")
-
-        # Iniciamos animación
-        self.timer_animacion.start(800)
-
-    # Módulo 6: Árbol a Código (Funcionalidad y Procedimiento)
-    def procesar_arbol_a_codigo(self, tipo):
-        if not self.arbol_manual:
-            QMessageBox.warning(self, "Aviso", "Primero construye un árbol.")
-            return
-
-        postfija = self.calc.obtener_postfija(self.arbol_manual)
-        ecuacion_falsa = " ".join(postfija)
-        self.stackedWidget_2.setCurrentIndex(1)
-        self.procesar_codigo(ecuacion_falsa, tipo, self.area_res6, self.tab_2, es_desde_arbol=True)
-
-    # Módulos 5 y 6: Expresión/Árbol a Código (Generación)
-    def procesar_codigo(self, ecuacion, tipo, area_res, tabla, es_desde_arbol=False):
-        if not ecuacion: return
-        try:
-            posfija = ecuacion.split() if es_desde_arbol else self.calc.infija_a_posfija(ecuacion)
-            cod_p, triplos, cuadruplos = self.gen.generar_todo(posfija)
-
-            proc = "⚙️ PROCEDIMIENTO:\n\n"
-            proc += f"1. Extracción de Postfija:\n   {' '.join(posfija)}\n\n"
-            proc += "2. Asignación de variables temporales (T1, T2...) mediante pila.\n\n"
-
-            if tipo == "codigop":
-                self.mostrar_texto_en_scroll(area_res,
-                                             proc + "3. Traducción a Nemónicos (LOD, ADD, MUL)\n\n🎯 RESULTADO (CÓDIGO P):\n" + "\n".join(
-                                                 cod_p))
-                tabla.setRowCount(0)
-            elif tipo == "triplos":
-                datos = [[i, op, a1, a2] for i, (op, a1, a2) in enumerate(triplos)]
-                self.llenar_tabla(tabla, ["Índice", "Operador", "Arg 1", "Arg 2"], datos)
-                self.mostrar_texto_en_scroll(area_res, proc + "3. Mapeo a tabla de 3 Direcciones (Sin resultado).")
-            elif tipo == "cuadruplos":
-                datos = [[i, op, a1, a2, res] for i, (op, a1, a2, res) in enumerate(cuadruplos)]
-                self.llenar_tabla(tabla, ["Índice", "Operador", "Arg 1", "Arg 2", "Resultado"], datos)
-                self.mostrar_texto_en_scroll(area_res, proc + "3. Mapeo a tabla de 4 Direcciones (Con variables T).")
-        except Exception as e:
-            self.mostrar_texto_en_scroll(area_res, f"❌ Error:\n{str(e)}")
-
-    # Módulo 3: Expresión a Notación (Animación)
     def iniciar_animacion_notacion(self, tipo):
-        ecuacion = self.lineEdit_3.text()
-        if not ecuacion: return
+        self.ecuacion_animacion = self.lineEdit_3.text()
+        if not self.ecuacion_animacion: return
         try:
-            posfija = self.calc.infija_a_posfija(ecuacion)
+            posfija = self.calc.infija_a_posfija(self.ecuacion_animacion)
             self.arbol_animacion = self.calc.construir_arbol(posfija)
-
             if tipo == "prefija":
                 self.lista_animacion = self.calc.obtener_prefija(self.arbol_animacion)
             elif tipo == "infija":
                 self.lista_animacion = self.calc.obtener_infija(self.arbol_animacion)
             elif tipo == "postfija":
                 self.lista_animacion = self.calc.obtener_postfija(self.arbol_animacion)
-
             self.pila_animacion = []
             self.indice_animacion = 0
             self.tipo_animacion = tipo
-            self.modo_animacion = "expresion"  # Le decimos al timer que es la animación del Módulo 3
-
             self.mostrar_texto_en_scroll(self.area_res3,
                                          f"⚙️ PROCEDIMIENTO:\n\nIniciando recorrido {tipo.capitalize()}...\nGenerando animación de Platos y Árbol.")
             self.timer_animacion.start(800)
         except Exception as e:
             pass
 
-    # ==========================================
-    # LÓGICA DEL TEMPORIZADOR DE ANIMACIONES
-    # ==========================================
     def paso_animacion(self):
         if self.indice_animacion >= len(self.lista_animacion):
             self.timer_animacion.stop()
-            msg = f"✅ PROCEDIMIENTO FINALIZADO\n\n🎯 RESULTADO:\n{' '.join(self.pila_animacion)}"
-
-            if self.modo_animacion == "expresion":
-                self.mostrar_texto_en_scroll(self.area_res3, msg)
-                self.dibujar_escena_dividida(None)
-            else:
-                self.mostrar_texto_en_scroll(self.area_res4, msg)
-                self.dibujar_platos_solos(self.grap_ANotacion2)
+            res_texto = f"✅ PROCEDIMIENTO FINALIZADO\n\n🎯 RESULTADO:\n{' '.join(self.pila_animacion)}"
+            # CONTEO MODULO 3
+            res_texto += self.lexico.generar_reporte_texto(self.ecuacion_animacion)
+            self.mostrar_texto_en_scroll(self.area_res3, res_texto)
+            self.dibujar_escena_dividida(None)
             return
 
         token_actual = self.lista_animacion[self.indice_animacion]
         self.pila_animacion.append(token_actual)
-
-        if self.modo_animacion == "expresion":
-            # Animación original del Módulo 3 (Árbol y Platos)
-            nodo_a_resaltar = self.buscar_nodo_por_valor(self.arbol_animacion, token_actual)
-            self.dibujar_escena_dividida(nodo_a_resaltar)
-            self.mostrar_texto_en_scroll(self.area_res3,
-                                         f"⚙️ PROCEDIMIENTO:\n\nProcesando nodo: {token_actual}\n\nPila actual:\n{' '.join(self.pila_animacion)}")
-        else:
-            # Nueva animación Módulo 4 (Solo Platos)
-            self.dibujar_platos_solos(self.grap_ANotacion2)
-            self.mostrar_texto_en_scroll(self.area_res4,
-                                         f"⚙️ PROCEDIMIENTO:\n\nProcesando nodo: {token_actual}\n\nAgregando al tope de la Pila.")
-
+        nodo_a_resaltar = self.buscar_nodo_por_valor(self.arbol_animacion, token_actual)
+        self.dibujar_escena_dividida(nodo_a_resaltar)
+        self.mostrar_texto_en_scroll(self.area_res3,
+                                     f"⚙️ PROCEDIMIENTO:\n\nProcesando nodo: {token_actual}\n\nPila actual:\n{' '.join(self.pila_animacion)}")
         self.indice_animacion += 1
 
     def buscar_nodo_por_valor(self, nodo, valor):
@@ -365,13 +300,54 @@ class CompiladorApp(QtWidgets.QMainWindow):
         return self.buscar_nodo_por_valor(nodo.derecha, valor)
 
     # ==========================================
-    # UTILIDADES GRAFICAS
+    # MODULOS 5 y 6 (Código)
+    # ==========================================
+    def procesar_arbol_a_codigo(self, tipo):
+        if not self.arbol_manual:
+            QMessageBox.warning(self, "Aviso", "Primero construye un árbol.")
+            return
+        postfija = self.calc.obtener_postfija(self.arbol_manual)
+        ecuacion_falsa = " ".join(postfija)
+        self.stackedWidget_2.setCurrentIndex(1)
+        self.procesar_codigo(ecuacion_falsa, tipo, self.area_res6, self.tab_2, es_desde_arbol=True)
+
+    def procesar_codigo(self, ecuacion, tipo, area_res, tabla, es_desde_arbol=False):
+        if not ecuacion: return
+        try:
+            posfija = ecuacion.split() if es_desde_arbol else self.calc.infija_a_posfija(ecuacion)
+            cod_p, triplos, cuadruplos = self.gen.generar_todo(posfija)
+
+            proc = "⚙️ PROCEDIMIENTO:\n\n"
+            proc += f"1. Extracción de Postfija:\n   {' '.join(posfija)}\n\n"
+            proc += "2. Asignación de variables temporales (T1, T2...) mediante pila.\n\n"
+
+            # CONTEO MODULO 5 Y 6
+            ecuacion_original = " ".join(self.calc.obtener_infija(self.arbol_manual)) if es_desde_arbol else ecuacion
+            reporte_conteo = self.lexico.generar_reporte_texto(ecuacion_original)
+
+            if tipo == "codigop":
+                self.mostrar_texto_en_scroll(area_res,
+                                             proc + "3. Traducción a Nemónicos\n\n🎯 RESULTADO (CÓDIGO P):\n" + "\n".join(
+                                                 cod_p) + reporte_conteo)
+                tabla.setRowCount(0)
+            elif tipo == "triplos":
+                datos = [[i, op, a1, a2] for i, (op, a1, a2) in enumerate(triplos)]
+                self.llenar_tabla(tabla, ["Índice", "Operador", "Arg 1", "Arg 2"], datos)
+                self.mostrar_texto_en_scroll(area_res, proc + "3. Mapeo a tabla de 3 Direcciones." + reporte_conteo)
+            elif tipo == "cuadruplos":
+                datos = [[i, op, a1, a2, res] for i, (op, a1, a2, res) in enumerate(cuadruplos)]
+                self.llenar_tabla(tabla, ["Índice", "Operador", "Arg 1", "Arg 2", "Resultado"], datos)
+                self.mostrar_texto_en_scroll(area_res, proc + "3. Mapeo a tabla de 4 Direcciones." + reporte_conteo)
+        except Exception as e:
+            self.mostrar_texto_en_scroll(area_res, f"❌ Error:\n{str(e)}")
+
+    # ==========================================
+    # DIBUJO Y UTILIDADES
     # ==========================================
     def dibujar_arbol_interactivo(self, nodo_raiz, vista_grafica):
         escena = QGraphicsScene()
         vista_grafica.setScene(escena)
-        if nodo_raiz:
-            self._dibujar_nodo_interactivo(nodo_raiz, escena, 0, 0, 100)
+        if nodo_raiz: self._dibujar_nodo_interactivo(nodo_raiz, escena, 0, 0, 100)
         escena.selectionChanged.connect(self.al_seleccionar_nodo)
 
     def _dibujar_nodo_interactivo(self, nodo, escena, x, y, dx):
@@ -417,28 +393,6 @@ class CompiladorApp(QtWidgets.QMainWindow):
             texto = escena.addText(token, QFont("Arial", 11, QFont.Weight.Bold))
             texto.setDefaultTextColor(QColor("#FFFFFF"))
             texto.setPos(x_base - texto.boundingRect().width() / 2, y_actual + 1)
-
-    # NUEVA FUNCIÓN: Dibuja solo los platos centrados para el Módulo 4
-    def dibujar_platos_solos(self, vista):
-        escena = QGraphicsScene()
-        vista.setScene(escena)
-
-        ancho_plato = 80
-        alto_plato = 30
-        x_base = 0  # Lo centramos en la vista
-        y_base = 120  # Lo bajamos un poco para que la pila suba
-
-        # Base de la pila (Línea verde)
-        escena.addLine(x_base - 60, y_base + 35, x_base + 60, y_base + 35, QPen(QColor("#00E676"), 4))
-
-        # Dibujamos cada plato desde la base hacia arriba
-        for i, token in enumerate(self.pila_animacion):
-            y_actual = y_base - (i * (alto_plato + 5))
-            escena.addRect(x_base - ancho_plato / 2, y_actual, ancho_plato, alto_plato, QPen(QColor("#FFFFFF"), 2),
-                           QBrush(QColor("#6C5CE7")))
-            texto = escena.addText(token, QFont("Arial", 12, QFont.Weight.Bold))
-            texto.setDefaultTextColor(QColor("#FFFFFF"))
-            texto.setPos(x_base - texto.boundingRect().width() / 2, y_actual + 2)
 
     def _dibujar_nodo_animado(self, nodo, escena, x, y, dx, nodo_resaltado):
         radio = 18
